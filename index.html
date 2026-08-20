@@ -451,6 +451,7 @@
     }
     .custom-link-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .drag-handle { cursor: grab; color: var(--text-sub); font-size: 0.95rem; margin-right: 6px; }
+    .custom-link-row .link-title-input, .custom-link-row .link-url-input { user-select: text; -webkit-user-select: text; touch-action: manipulation; pointer-events: auto; position: relative; z-index: 2; }
 
     .link-health-status { font-size: 0.7rem; font-weight: 800; margin-top: -6px; margin-bottom: 10px; display: block; text-align: left; }
     .link-health-valid { color: #10b981; }
@@ -824,9 +825,9 @@
           <div class="stat-number" id="stat-total-profiles">0</div>
           <div class="stat-label">Total Profiles</div>
         </div>
-        <div class="stat-card" onclick="showStatDetails('links')" title="Click to view all links">
-          <div class="stat-number" id="stat-total-links">0</div>
-          <div class="stat-label">Total Links</div>
+        <div class="stat-card" title="Local storage used by this app">
+          <div class="stat-number" id="stat-storage-used">0 KB</div>
+          <div class="stat-label">Storage Used</div>
         </div>
         <div class="stat-card" onclick="openTrashModal()" title="Click to open Recycle Bin">
           <div class="stat-number" id="stat-trash-count">0</div>
@@ -861,6 +862,11 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3 style="font-size: 1.1rem; font-weight: 800;"><i class="fa-solid fa-file-pen" style="color: #f59e0b;"></i> Saved Drafts</h3>
+      <div id="last-backup-status-box" style="margin: 10px 0 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg);">
+        <div style="font-size: 0.72rem; color: var(--text-sub); font-weight: 700;">Last Backup</div>
+        <div id="last-backup-status" style="font-size: 0.86rem; font-weight: 800; margin-top: 2px;">No backup recorded</div>
+      </div>
+
         <button class="btn btn-secondary btn-icon-only" onclick="closeModal('drafts-modal')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <p style="font-size: 0.76rem; color: var(--text-sub); margin-bottom: 12px;">Draft profiles ordered alphabetically by name:</p>
@@ -1659,6 +1665,7 @@
     let customAppBgBase64 = localStorage.getItem('pm_app_bg') || "";
 
     let sortableLinksInstance = null;
+    let logoVaultMemoryCache = null;
     let failedAttempts = 0;
     let lockoutUntil = 0;
     let currentQAProfileId = null;
@@ -1695,16 +1702,28 @@
       window.addEventListener(evt, resetInactivityTimer, { passive: true });
     });
 
+    function clearPrivacyBlurOnResume() {
+      if (!document.hidden) {
+        document.body.classList.remove('privacy-blurred');
+        resetInactivityTimer();
+      }
+    }
+
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         document.body.classList.add('privacy-blurred');
         // Do not destroy the session merely because the browser tab was hidden.
         // The configured inactivity timer remains the single lock mechanism.
       } else {
-        document.body.classList.remove('privacy-blurred');
-        resetInactivityTimer();
+        clearPrivacyBlurOnResume();
       }
     });
+
+    // Some mobile browsers restore a PWA/page without reliably firing the
+    // visible branch above. These resume events only clear the same temporary
+    // privacy layer; they do not alter the lock/session behavior.
+    window.addEventListener('pageshow', clearPrivacyBlurOnResume, { passive: true });
+    window.addEventListener('focus', clearPrivacyBlurOnResume, { passive: true });
 
     let draftMemoryCache = null;
     let draftSaveTimer = null;
@@ -1862,7 +1881,10 @@
       else drafts.push(draftObj);
 
       drafts.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'accent' }));
-      saveStoredDrafts(drafts, true);
+      // Keep typing/pasting responsive: localStorage is synchronous and can be
+      // expensive when link/icon data contains large base64 strings. The draft
+      // remains in memory immediately and is committed by the existing debounce.
+      saveStoredDrafts(drafts, false);
     }
 
 
@@ -2108,7 +2130,48 @@
       }
     }
 
-    function showStatDetails(type) {
+    
+    
+    function updateLastBackupStatus() {
+      const el = document.getElementById('last-backup-status');
+      if (!el) return;
+      try {
+        const raw = localStorage.getItem('pm_last_backup_at');
+        if (!raw) { el.textContent = 'No backup recorded'; return; }
+        const d = new Date(Number(raw));
+        if (Number.isNaN(d.getTime())) { el.textContent = 'No backup recorded'; return; }
+        el.textContent = d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (err) {
+        el.textContent = 'No backup recorded';
+      }
+    }
+
+function updateStorageUsedStat() {
+      const el = document.getElementById('stat-storage-used');
+      if (!el) return;
+      try {
+        let bytes = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          const value = localStorage.getItem(key) || '';
+          bytes += (key ? key.length : 0) + value.length;
+        }
+        bytes *= 2;
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes, unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit++;
+        }
+        el.textContent = unit === 0
+          ? `${Math.round(size)} ${units[unit]}`
+          : `${size.toFixed(size < 10 ? 1 : 0)} ${units[unit]}`;
+      } catch (err) {
+        el.textContent = '—';
+      }
+    }
+
+function showStatDetails(type) {
       const modal = document.getElementById('stat-list-modal');
       const titleEl = document.getElementById('stat-modal-title');
       const bodyEl = document.getElementById('stat-modal-body');
@@ -2725,21 +2788,29 @@
 
         req.onsuccess = async () => {
           const rawList = req.result || [];
-          const decryptedList = (await Promise.all(rawList.map(async item => {
-            try {
-              if (item.encrypted) {
-                const decrypted = await decryptObject(item.encrypted, masterCryptoKey);
-                if (!decrypted || typeof decrypted !== 'object') return null;
-                decrypted.id = Number(item.id);
-                decrypted.name = String(decrypted.name || 'Unnamed Profile');
-                decrypted.cat = String(decrypted.cat || '');
-                decrypted.tag = String(decrypted.tag || '');
-                decrypted.links = Array.isArray(decrypted.links) ? decrypted.links : [];
-                return decrypted;
-              }
-            } catch (e) { console.error("Decryption error", e); }
-            return null;
-          }))).filter(Boolean);
+          const decryptedList = [];
+          // Decrypt in small batches so a large vault does not monopolize the UI.
+          const DECRYPT_BATCH_SIZE = 12;
+          for (let i = 0; i < rawList.length; i += DECRYPT_BATCH_SIZE) {
+            const batch = rawList.slice(i, i + DECRYPT_BATCH_SIZE);
+            const batchResult = await Promise.all(batch.map(async item => {
+              try {
+                if (item.encrypted) {
+                  const decrypted = await decryptObject(item.encrypted, masterCryptoKey);
+                  if (!decrypted || typeof decrypted !== 'object') return null;
+                  decrypted.id = Number(item.id);
+                  decrypted.name = String(decrypted.name || 'Unnamed Profile');
+                  decrypted.cat = String(decrypted.cat || '');
+                  decrypted.tag = String(decrypted.tag || '');
+                  decrypted.links = Array.isArray(decrypted.links) ? decrypted.links : [];
+                  return decrypted;
+                }
+              } catch (e) { console.error("Decryption error", e); }
+              return null;
+            }));
+            for (const profile of batchResult) if (profile) decryptedList.push(profile);
+            if (i + DECRYPT_BATCH_SIZE < rawList.length) await new Promise(requestAnimationFrame);
+          }
 
           if (loadToken !== profilesLoadToken) return;
 
@@ -3122,10 +3193,14 @@
 
     function initSortableLinks() {
       const el = document.getElementById('custom-links-container');
-      if (sortableLinksInstance) sortableLinksInstance.destroy();
+      if (!el) return;
+      if (sortableLinksInstance) return;
       sortableLinksInstance = new Sortable(el, {
         handle: '.drag-handle',
-        animation: 150
+        animation: 150,
+        delayOnTouchOnly: true,
+        delay: 220,
+        touchStartThreshold: 6
       });
     }
 
@@ -3177,8 +3252,8 @@
           <span><i class="fa-solid fa-grip-vertical drag-handle"></i> <i class="fa-solid fa-link" style="color: var(--primary);"></i> Link Item</span>
           <button type="button" class="remove-link-btn" onclick="document.getElementById('${rowId}').remove(); autoSaveDraft();"><i class="fa-solid fa-trash"></i> Remove</button>
         </div>
-        <input type="text" class="input-field link-title-input" placeholder="Title / Handle Name" value="${escapeHtml(title)}" required oninput="autoSaveDraft()">
-        <input type="text" class="input-field link-url-input" placeholder="Target Link (https://...)" value="${escapeHtml(url)}" oninput="checkLinkUrlHealth(this, '${statusId}'); autoSaveDraft();" required>
+        <input type="text" class="input-field link-title-input" placeholder="Title / Handle Name" value="${escapeHtml(title)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" required oninput="autoSaveDraft()">
+        <input type="text" class="input-field link-url-input" placeholder="Target Link (https://...)" value="${escapeHtml(url)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" oninput="checkLinkUrlHealth(this, '${statusId}'); autoSaveDraft();" required>
         <span class="link-health-status" id="${statusId}"></span>
 
         <label style="font-size: 0.74rem; font-weight: 600; color: var(--text-sub); display: block; margin-bottom: 3px;">
@@ -3217,6 +3292,7 @@
 
       const saveBtn = document.getElementById('save-btn');
       if (saveBtn) {
+        if (saveBtn.disabled) return;
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Encrypting & Saving…';
       }
@@ -3299,7 +3375,22 @@
           }
           closeModal('profile-modal');
           setTimeout(() => { draftCaptureSuspended = false; }, 0);
-          loadProfiles();
+
+          // The just-saved profile is already available in memory. Updating only
+          // this record avoids decrypting and re-rendering every profile after
+          // each save, which becomes increasingly expensive with many profiles.
+          const normalizedSavedId = Number(savedId);
+          const savedProfile = { ...profileData, id: normalizedSavedId };
+          const existingProfileIndex = allProfiles.findIndex(p => Number(p.id) === normalizedSavedId);
+          if (existingProfileIndex >= 0) allProfiles[existingProfileIndex] = savedProfile;
+          else allProfiles.push(savedProfile);
+          allProfiles.sort((a, b) => {
+            const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
+            if (pinDiff) return pinDiff;
+            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+          });
+          updateDashboardStats();
+          renderProfiles();
 
           // Descriptor generation is now background work.
           if (savedId && profileData.img) {
@@ -3307,9 +3398,9 @@
           }
 
           // Directory/backup writes must never block the save UI.
-          setTimeout(() => triggerDirectorySync(), 0);
+          setTimeout(() => triggerDirectorySync(), 1500);
           if (localStorage.getItem('pm_auto_backup') === 'true') {
-            setTimeout(() => triggerAutoBackupBackground(), 0);
+            setTimeout(() => triggerAutoBackupBackground(), 1500);
           }
         };
         tx.onerror = () => {
@@ -3357,6 +3448,10 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      try {
+        localStorage.setItem('pm_last_backup_at', String(Date.now()));
+        updateLastBackupStatus();
+      } catch (err) {}
     }
 
     async function setupDirectorySync() {
@@ -3496,8 +3591,19 @@
       }
     }
 
-    function getStoredLogoVault() { return JSON.parse(localStorage.getItem('pm_user_logo_vault') || '[]'); }
-    function saveStoredLogoVault(list) { localStorage.setItem('pm_user_logo_vault', JSON.stringify(list)); }
+    function getStoredLogoVault() {
+      if (Array.isArray(logoVaultMemoryCache)) return logoVaultMemoryCache;
+      try {
+        logoVaultMemoryCache = JSON.parse(localStorage.getItem('pm_user_logo_vault') || '[]');
+      } catch (err) {
+        logoVaultMemoryCache = [];
+      }
+      return logoVaultMemoryCache;
+    }
+    function saveStoredLogoVault(list) {
+      logoVaultMemoryCache = Array.isArray(list) ? list : [];
+      localStorage.setItem('pm_user_logo_vault', JSON.stringify(logoVaultMemoryCache));
+    }
 
     function getStoredBadgeVault() { return JSON.parse(localStorage.getItem('pm_user_badge_vault') || '[]'); }
     function saveStoredBadgeVault(list) { localStorage.setItem('pm_user_badge_vault', JSON.stringify(list)); }
@@ -4105,6 +4211,8 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      updateStorageUsedStat();
+      updateLastBackupStatus();
       loadScreenView();
       loadAppearance();
       ensureFavoriteCategoryExists();
