@@ -1,0 +1,4124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Zero-Knowledge Bio Vault Pro Max</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="data:application/manifest+json;utf-8,%7B%22name%22%3A%22Zero-Knowledge%20Bio%20Vault%20Pro%20Max%22%2C%22short_name%22%3A%22BioVault%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23070b14%22%2C%22theme_color%22%3A%22%234f46e5%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn-icons-png.flaticon.com%2F512%2F1000%2F1000997.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+
+  <!-- Icons & Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Fira+Code:wght@500;600&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Cropper.js & SortableJS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.7/Sortable.min.js"></script>
+  <!-- Modern face recognition engine -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+  <style>
+    :root {
+      --app-font: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --bg: #f1f5f9;
+      --card-bg: #ffffff;
+      --text-main: #090d16;
+      --text-sub: #64748b;
+      --border-color: #cbd5e1;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --excel-btn: #107c41;
+      --danger: #ef4444;
+      --shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+      --card-radius: 20px;
+      --glass-blur: 20px;
+      --bg-image: none;
+    }
+    [data-theme="dark"] {
+      --bg: #070b14;
+      --card-bg: #0e1526;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --border-color: #1e293b;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--app-font); -webkit-tap-highlight-color: transparent; }
+    body {
+      background-color: var(--bg);
+      background-image: var(--bg-image);
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 0 0 85px 0;
+      transition: background 0.3s ease, color 0.3s ease;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    body.privacy-blurred #main-app {
+      filter: blur(16px);
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%; margin: 0 auto; padding: 18px;
+      transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    body.zoom-transition .container { transform: scale(0.96); opacity: 0.7; }
+
+    body[data-view="mobile"] .container { max-width: 480px; }
+    body[data-view="desktop"] .container { max-width: 1140px; }
+
+    .mini-cards-grid.layout-list { display: flex; flex-direction: column; gap: 14px; }
+    .mini-cards-grid.layout-compact { display: flex; flex-direction: column; gap: 8px; }
+    .mini-cards-grid.layout-compact .mini-card { padding: 10px 14px; }
+    .mini-cards-grid.layout-compact .mini-avatar { width: 48px; height: 48px; min-width: 48px; }
+    .mini-cards-grid.layout-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+
+    .dashboard-top-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .dashboard-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; flex: 1;
+      animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+
+    .stat-card {
+      background: var(--card-bg); border: 1.5px solid var(--border-color); border-radius: var(--card-radius);
+      padding: 14px 10px; text-align: center; box-shadow: var(--shadow); cursor: pointer;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s, box-shadow 0.25s;
+    }
+    .stat-card:hover { transform: translateY(-3px); border-color: var(--primary); box-shadow: 0 15px 30px -5px rgba(79, 70, 229, 0.22); }
+    .stat-number { font-size: 1.35rem; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+    .stat-label { font-size: 0.65rem; font-weight: 700; color: var(--text-sub); text-transform: uppercase; margin-top: 3px; letter-spacing: 0.5px; }
+
+    .theme-switch-btn {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: var(--shadow); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .theme-switch-btn:hover { transform: scale(1.08); border-color: var(--primary); }
+    .theme-switch-btn i { font-size: 1.1rem; transition: transform 0.4s ease; }
+    [data-theme="light"] .theme-switch-btn i { color: #f59e0b; transform: rotate(0deg); }
+    [data-theme="dark"] .theme-switch-btn i { color: #38bdf8; transform: rotate(360deg); }
+
+    .crypto-badge {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem;
+      background: rgba(16, 185, 129, 0.12); color: #059669; padding: 6px 14px;
+      border-radius: 20px; font-weight: 700; margin-bottom: 14px; border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    [data-theme="dark"] .crypto-badge { background: rgba(52, 211, 153, 0.15); color: #34d399; border-color: rgba(52, 211, 153, 0.3); }
+
+    #login-screen, #setup-screen, #forgot-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px;
+      backdrop-filter: blur(var(--glass-blur)); transition: opacity 0.3s ease;
+    }
+    .login-box {
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      padding: 40px 28px; border-radius: 32px; width: 100%; max-width: 410px; text-align: center;
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.3), 0 0 30px rgba(79, 70, 229, 0.12);
+      animation: scaleUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes scaleUp { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+    .login-icon-bubble {
+      width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%;
+      background: rgba(79, 70, 229, 0.12); color: var(--primary);
+      display: flex; align-items: center; justify-content: center; font-size: 1.7rem;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+    }
+
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    .shake { animation: shakeError 0.4s ease; }
+
+    .password-wrapper { position: relative; display: flex; align-items: center; margin-bottom: 10px; }
+    .password-wrapper .input-field { margin-bottom: 0; padding-right: 44px; }
+    .toggle-pass-btn { position: absolute; right: 16px; cursor: pointer; color: var(--text-sub); }
+
+    .strength-meter-bar {
+      height: 5px; width: 100%; background: var(--border-color); border-radius: 3px; margin-bottom: 12px; overflow: hidden; display: flex;
+    }
+    .strength-progress { height: 100%; width: 0%; transition: width 0.3s ease, background 0.3s ease; }
+    .strength-text { font-size: 0.72rem; font-weight: 700; text-align: left; margin-bottom: 10px; color: var(--text-sub); display: block; }
+
+    .forgot-link-btn {
+      background: none; border: none; color: var(--primary); font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; text-decoration: underline; margin-top: 16px; display: inline-block;
+    }
+
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0 20px; border-bottom: 1.5px solid var(--border-color); margin-bottom: 18px;
+    }
+    .brand-title-wrap { display: flex; align-items: center; gap: 10px; }
+    .header-logo-img { max-height: 38px; max-width: 100px; object-fit: contain; border-radius: 10px; }
+    .header h1 { font-size: 1.25rem; font-weight: 800; display: flex; align-items: center; gap: 8px; letter-spacing: -0.3px; }
+    .nav-actions { display: flex; align-items: center; gap: 8px; position: relative; }
+
+    .header-search-wrap { display: flex; align-items: center; position: relative; gap: 4px; }
+    .header-search-input {
+      position: absolute; right: 90px; top: -6px; width: 0; opacity: 0; padding: 0; border: 1.5px solid transparent;
+      border-radius: 12px; background: var(--card-bg); color: var(--text-main);
+      font-size: 0.88rem; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none; z-index: 50;
+    }
+    .header-search-input.expanded {
+      width: 210px; opacity: 1; padding: 10px 14px; border-color: var(--border-color);
+      pointer-events: auto; box-shadow: 0 15px 35px -5px rgba(0,0,0,0.25);
+    }
+    .header-search-input:focus { outline: 2px solid var(--primary); }
+
+    .search-results-dropdown {
+      position: absolute; top: calc(100% + 10px); right: 0; width: 280px; max-height: 340px;
+      overflow-y: auto; background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: 20px; box-shadow: 0 25px 50px -10px rgba(0,0,0,0.35);
+      z-index: 200; display: none; flex-direction: column; padding: 8px;
+      backdrop-filter: blur(var(--glass-blur));
+    }
+    .search-results-dropdown.show { display: flex; }
+    .search-result-item {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .search-result-item:hover { background: rgba(99, 102, 241, 0.12); }
+    .search-res-img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
+    .search-res-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; text-align: left; }
+    .search-res-name { font-size: 0.88rem; font-weight: 800; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .search-res-meta { font-size: 0.7rem; font-weight: 600; color: var(--text-sub); }
+
+    .category-filter-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+    .category-filter-bar {
+      display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 4px;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .category-filter-bar::-webkit-scrollbar { display: none; }
+    .cat-chip {
+      padding: 8px 18px; border-radius: 22px; font-size: 0.82rem; font-weight: 700;
+      background: var(--card-bg); border: 1.5px solid var(--border-color); color: var(--text-sub);
+      white-space: nowrap; cursor: pointer; transition: all 0.2s ease; box-shadow: var(--shadow);
+    }
+    .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .cat-chip.active { background: var(--primary); color: #ffffff; border-color: var(--primary); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4); }
+
+    .dropdown-wrapper { position: relative; }
+    .menu-dropdown {
+      position: absolute; right: 0; top: calc(100% + 10px);
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: 20px; box-shadow: 0 25px 50px -10px rgba(0,0,0,0.3);
+      width: 250px; display: none; flex-direction: column; padding: 8px;
+      z-index: 100; backdrop-filter: blur(var(--glass-blur));
+    }
+    .menu-dropdown.show { display: flex; }
+    .menu-item {
+      display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+      font-size: 0.88rem; font-weight: 700; color: var(--text-main);
+      background: none; border: none; width: 100%; text-align: left;
+      border-radius: 12px; cursor: pointer; transition: background 0.15s, color 0.15s;
+    }
+    .menu-item:hover { background: rgba(99, 102, 241, 0.12); color: var(--primary); }
+    .menu-item.danger-item:hover { background: rgba(239, 68, 68, 0.12); color: var(--danger); }
+    .menu-divider { height: 1.5px; background: var(--border-color); margin: 6px 0; }
+
+    .btn {
+      padding: 11px 20px; border-radius: 14px; border: none; cursor: pointer;
+      font-size: 0.9rem; font-weight: 800; display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: var(--shadow);
+    }
+    .btn:hover { transform: translateY(-2px); opacity: 0.95; }
+    .btn:active { transform: translateY(0); }
+    .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.45); }
+    .btn-success { background: var(--excel-btn); color: #fff; }
+    .btn-secondary { background: var(--card-bg); color: var(--text-main); border: 1.5px solid var(--border-color); }
+    .btn-danger { background: var(--danger); color: #fff; box-shadow: 0 8px 20px -4px rgba(239, 68, 68, 0.4); }
+    .btn-icon-only { padding: 10px 14px; font-size: 1.05rem; border-radius: 14px; }
+    
+    .input-field {
+      width: 100%; padding: 13px 16px; border-radius: 14px; border: 1.5px solid var(--border-color);
+      background: var(--card-bg); color: var(--text-main); margin-bottom: 14px; font-size: 0.92rem;
+      transition: border-color 0.2s, box-shadow 0.2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .input-field:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.18), inset 0 2px 4px rgba(0,0,0,0.02); }
+
+    .editor-section-card {
+      background: rgba(0, 0, 0, 0.025); border: 1.5px solid var(--border-color);
+      border-radius: 18px; padding: 16px; margin-bottom: 16px;
+    }
+    [data-theme="dark"] .editor-section-card { background: rgba(255, 255, 255, 0.025); }
+    .editor-section-header { font-size: 0.88rem; font-weight: 800; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .editor-field-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+
+    .manager-item-card {
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: 14px; padding: 12px 14px; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px; margin-bottom: 10px; box-shadow: var(--shadow);
+    }
+
+    .badge-live-preview-box {
+      padding: 14px; background: rgba(0, 0, 0, 0.03); border: 1.5px dashed var(--border-color);
+      border-radius: 14px; text-align: center; margin-bottom: 14px;
+    }
+
+    .image-selector-wrap {
+      display: flex; gap: 14px; align-items: center;
+      background: var(--card-bg); border: 1.5px dashed var(--border-color); border-radius: 16px; padding: 12px;
+    }
+    .image-preview-thumb { width: 70px; height: 70px; border-radius: 14px; object-fit: cover; background: #e2e8f0; border: 2px solid var(--border-color); }
+    .image-preview-cover { width: 110px; height: 60px; border-radius: 14px; object-fit: cover; background: #cbd5e1; border: 2px solid var(--border-color); }
+
+    .theme-presets-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .theme-preset-item {
+      height: 38px; border-radius: 10px; cursor: pointer; border: 2px solid var(--border-color);
+      display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; color: #fff;
+      transition: transform 0.2s; text-shadow: 0 1px 2px rgba(0,0,0,0.6); box-shadow: var(--shadow);
+    }
+    .theme-preset-item:hover { transform: scale(1.06); }
+
+    .color-picker-row {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+      padding: 10px 14px; background: rgba(0,0,0,0.02); border-radius: 12px; border: 1.5px solid var(--border-color);
+    }
+    .color-picker-row label { font-size: 0.85rem; font-weight: 700; color: var(--text-sub); }
+    .color-picker-row input[type="color"] { border: none; width: 44px; height: 32px; border-radius: 8px; cursor: pointer; background: transparent; }
+
+    .mini-card {
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: var(--card-radius); padding: 16px; cursor: pointer;
+      box-shadow: var(--shadow); display: flex; flex-direction: row;
+      align-items: center; gap: 16px; text-align: left; width: 100%;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+      position: relative; animation: cardFadeIn 0.3s ease;
+      -webkit-touch-callout: none;
+    }
+    @keyframes cardFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .mini-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.22); }
+    .mini-card:active { transform: scale(0.98); }
+    .mini-card.is-pinned { border: 2px solid #f59e0b; background: linear-gradient(135deg, var(--card-bg) 0%, rgba(245, 158, 11, 0.05) 100%); }
+    
+    @keyframes bounceIcon {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.4) rotate(20deg); }
+      100% { transform: scale(1); }
+    }
+    .pin-btn-badge {
+      background: transparent; border: none;
+      color: #cbd5e1; font-size: 1.25rem; cursor: pointer; padding: 6px; transition: all 0.2s;
+    }
+    .pin-btn-badge.pinned { color: #f59e0b; animation: bounceIcon 0.35s ease; }
+    .pin-btn-badge.favorited { color: #ec4899; animation: bounceIcon 0.35s ease; }
+
+    .mini-avatar {
+      width: 72px; height: 72px; min-width: 72px;
+      border-radius: 50%; object-fit: cover;
+      border: 3px solid var(--primary); background: #e2e8f0;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+    }
+    .mini-info { display: flex; flex-direction: column; justify-content: center; overflow: hidden; flex: 1; padding-right: 32px; }
+    .mini-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+    .mini-name { font-size: 1.15rem; font-weight: 800; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    .dynamic-badge-pill {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 800;
+      padding: 3px 10px; border-radius: 14px; border: 1.5px solid var(--border-color);
+    }
+    .dynamic-badge-img { width: 14px; height: 14px; object-fit: contain; }
+
+    .mini-cat {
+      font-size: 0.76rem; font-weight: 700; color: var(--text-sub); text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .mini-badge {
+      display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem;
+      color: var(--primary); background: rgba(99, 102, 241, 0.12); padding: 4px 10px;
+      border-radius: 10px; font-weight: 800; width: fit-content;
+    }
+
+    .bottom-add-container { margin-top: 35px; display: flex; justify-content: center; width: 100%; }
+    .btn-add-bottom {
+      width: 100%; max-width: 440px; padding: 15px 24px; font-size: 1.05rem; font-weight: 800; border-radius: 18px;
+      box-shadow: 0 10px 30px -4px rgba(79, 70, 229, 0.45); background: var(--primary);
+      color: #ffffff; border: none; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 10px;
+    }
+
+    #quick-action-modal .modal-content { max-width: 360px; padding: 24px; text-align: center; border-radius: 28px; }
+    .quick-action-avatar {
+      width: 78px; height: 78px; border-radius: 50%; object-fit: cover;
+      margin: 0 auto 12px; border: 3px solid var(--primary); display: block; box-shadow: var(--shadow);
+    }
+    .quick-action-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+
+    .bio-view-modal-content {
+      background: var(--card-bg); border: 1.5px solid var(--border-color); border-radius: 28px;
+      width: 100%; max-width: 450px; max-height: 92vh; overflow-y: auto; position: relative;
+      padding: 0 0 24px; box-shadow: 0 30px 60px -15px rgba(0,0,0,0.45);
+      animation: bouncyPopup 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes bouncyPopup {
+      0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+      70% { transform: scale(1.03) translateY(-4px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .template-glass {
+      background: rgba(255, 255, 255, 0.5) !important;
+      backdrop-filter: blur(20px) !important;
+      border: 1.5px solid rgba(255, 255, 255, 0.4) !important;
+    }
+    [data-theme="dark"] .template-glass {
+      background: rgba(14, 21, 38, 0.7) !important;
+      border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
+    }
+    .template-neon {
+      border: 2px solid #06b6d4 !important;
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.4) !important;
+    }
+    .template-neon .bio-name { color: #06b6d4 !important; text-shadow: 0 0 12px rgba(6, 182, 212, 0.6); }
+    .template-neon .bio-link-btn { border-color: #ec4899 !important; box-shadow: 0 0 12px rgba(236, 72, 153, 0.25); }
+    .template-royal {
+      border: 2px solid #d97706 !important;
+      background: radial-gradient(circle, var(--card-bg) 0%, rgba(217, 119, 6, 0.1) 100%) !important;
+    }
+    .template-royal .bio-name { color: #d97706 !important; font-family: 'Cinzel', serif !important; letter-spacing: 2px; }
+    .template-royal .bio-link-btn { border-color: #d97706 !important; }
+
+    .bio-modal-close-btn {
+      position: absolute; top: 14px; right: 14px; z-index: 10;
+      background: rgba(0,0,0,0.55); color: #fff; border: none; width: 36px; height: 36px;
+      border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+
+    .bio-cover { width: 100%; height: 160px; object-fit: cover; background: #cbd5e1; display: block; }
+    .bio-avatar-wrapper { position: relative; margin-top: -60px; text-align: center; }
+    .bio-avatar {
+      width: 110px; height: 110px; border-radius: 50%; object-fit: cover;
+      border: 4px solid var(--card-bg); box-shadow: 0 8px 20px rgba(0,0,0,0.2); background: #e2e8f0;
+    }
+    .bio-content { padding: 14px 24px 8px; text-align: center; }
+    .bio-name-wrap { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+    .bio-name {
+      font-family: 'Cinzel', serif; font-size: 1.35rem; font-weight: 800;
+      letter-spacing: 1px; text-transform: uppercase; color: var(--text-main);
+    }
+    .bio-title {
+      font-size: 0.78rem; font-weight: 800; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text-sub); margin-bottom: 18px;
+    }
+
+    .bio-links-stack { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+    .bio-link-btn {
+      display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: 14px; text-decoration: none; color: var(--text-main);
+      font-size: 0.92rem; font-weight: 700; transition: all 0.2s ease; position: relative; box-shadow: var(--shadow);
+    }
+    .bio-link-btn:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
+    .bio-link-btn.link-expired { opacity: 0.45; pointer-events: none; filter: grayscale(80%); }
+    .expiry-tag {
+      margin-left: auto; font-size: 0.68rem; padding: 3px 8px; border-radius: 8px;
+      background: rgba(239, 68, 68, 0.12); color: var(--danger); font-weight: 800;
+    }
+
+    .bio-custom-icon { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; }
+    .bio-fa-icon { font-size: 1.25rem; width: 26px; text-align: center; }
+
+    .bio-subtle-actions {
+      display: flex; justify-content: center; align-items: center; gap: 16px;
+      margin-top: 16px; padding-top: 14px; border-top: 1.5px dashed var(--border-color);
+    }
+    .subtle-action-btn {
+      background: none; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700;
+      color: var(--text-sub); text-decoration: underline;
+    }
+    .subtle-action-btn:hover { color: var(--primary); }
+    .subtle-action-btn.delete-btn:hover { color: var(--danger); }
+
+    .custom-link-row {
+      background: var(--card-bg); border: 1.5px solid var(--border-color);
+      border-radius: 16px; padding: 14px; margin-bottom: 14px; position: relative; box-shadow: var(--shadow);
+    }
+    .custom-link-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .drag-handle { cursor: grab; color: var(--text-sub); font-size: 0.95rem; margin-right: 6px; }
+
+    .link-health-status { font-size: 0.7rem; font-weight: 800; margin-top: -6px; margin-bottom: 10px; display: block; text-align: left; }
+    .link-health-valid { color: #10b981; }
+    .link-health-invalid { color: #ef4444; }
+
+    .link-logo-box-wrapper { margin-top: 10px; background: rgba(0, 0, 0, 0.02); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 10px; }
+    .link-logo-box-title { font-size: 0.76rem; font-weight: 800; color: var(--text-sub); margin-bottom: 8px; }
+    .link-logo-grid { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
+    .link-logo-grid::-webkit-scrollbar { display: none; }
+    
+    .logo-box-item {
+      display: flex; align-items: center; justify-content: center;
+      width: 48px; height: 48px; min-width: 48px; border: 2px solid var(--border-color);
+      border-radius: 12px; background: var(--bg); cursor: pointer; position: relative; transition: all 0.2s;
+    }
+    .logo-box-item:hover { border-color: var(--primary); transform: scale(1.06); }
+    .logo-box-item.selected { border-color: var(--primary); background: rgba(99, 102, 241, 0.18); }
+    .logo-box-item img { width: 28px; height: 28px; object-fit: contain; pointer-events: none; }
+    .logo-box-item .check-indicator {
+      position: absolute; top: -4px; right: -4px; background: var(--primary); color: #fff;
+      font-size: 0.55rem; width: 16px; height: 16px; border-radius: 50%; display: none;
+      align-items: center; justify-content: center;
+    }
+    .logo-box-item.selected .check-indicator { display: flex; }
+
+    .vault-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .vault-tab-btn {
+      flex: 1; padding: 9px; font-size: 0.82rem; font-weight: 800; border-radius: 12px;
+      border: 1.5px solid var(--border-color); background: var(--card-bg); color: var(--text-sub); cursor: pointer;
+    }
+    .vault-tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35); }
+
+    .saved-logos-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px;
+      margin-top: 10px; max-height: 240px; overflow-y: auto; padding: 10px;
+      background: rgba(0,0,0,0.02); border: 1.5px solid var(--border-color); border-radius: 14px;
+    }
+    .saved-logo-item {
+      position: relative; display: flex; flex-direction: column; align-items: center;
+      padding: 10px 4px; border: 1.5px solid var(--border-color); border-radius: 12px; background: var(--card-bg);
+      box-shadow: var(--shadow);
+    }
+    .saved-logo-item img { width: 34px; height: 34px; object-fit: contain; }
+    .saved-logo-item .del-logo-btn {
+      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+      background: var(--danger); color: #fff; border: none; border-radius: 50%;
+      font-size: 0.65rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+
+    .modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none;
+      align-items: center; justify-content: center; z-index: 2000; padding: 14px;
+      backdrop-filter: blur(8px); animation: fadeIn 0.2s ease;
+    }
+    #quick-action-modal { z-index: 2800 !important; }
+    #categories-modal, #badge-manager-modal { z-index: 2500 !important; }
+    #logo-vault-modal { z-index: 3000 !important; }
+
+    #cropper-modal {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.94); display: none;
+      align-items: center; justify-content: center; z-index: 99999 !important; padding: 12px;
+      backdrop-filter: blur(14px);
+    }
+    .cropper-studio-card {
+      background: var(--card-bg); border-radius: 28px; width: 100%; max-width: 600px;
+      max-height: 95vh; display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 30px 70px -15px rgba(0,0,0,0.7); animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cropper-studio-header {
+      padding: 16px 20px; border-bottom: 1.5px solid var(--border-color);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cropper-canvas-area {
+      width: 100%; height: 400px; background: #05080f; position: relative; overflow: hidden;
+    }
+    .cropper-canvas-area img { max-width: 100%; display: block; }
+    
+    .cropper-toolbar {
+      padding: 12px 16px; background: rgba(0,0,0,0.03); border-top: 1.5px solid var(--border-color);
+      display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+    }
+    .cropper-tool-btn {
+      padding: 9px 14px; border-radius: 12px; background: var(--card-bg); border: 1.5px solid var(--border-color);
+      color: var(--text-main); font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex;
+      align-items: center; gap: 6px; transition: all 0.2s; box-shadow: var(--shadow);
+    }
+    .cropper-tool-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .cropper-footer {
+      padding: 14px 20px; border-top: 1.5px solid var(--border-color);
+      display: flex; justify-content: space-between; gap: 12px;
+    }
+
+    .modal-content {
+      background: var(--card-bg); border: 1.5px solid var(--border-color); border-radius: 28px;
+      width: 100%; max-width: 480px; padding: 24px 20px; max-height: 92vh; overflow-y: auto;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .empty-state { text-align: center; color: var(--text-sub); padding: 40px 0; grid-column: 1/-1; }
+
+    /* Performance & search UX */
+    #search-progress-overlay {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      z-index: 99990; background: rgba(2, 6, 23, 0.58); backdrop-filter: blur(5px);
+      padding: 20px;
+    }
+    #search-progress-overlay.show { display: flex; }
+    .search-progress-card {
+      width: min(380px, 92vw); padding: 24px; border-radius: 22px;
+      background: var(--card-bg); color: var(--text-main); border: 1.5px solid var(--border-color);
+      box-shadow: 0 25px 70px rgba(0,0,0,.35); text-align: center;
+    }
+    .search-progress-icon {
+      width: 54px; height: 54px; margin: 0 auto 12px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(99,102,241,.13); color: var(--primary); font-size: 1.25rem;
+    }
+    .search-progress-icon.spinning i { animation: searchSpin .9s linear infinite; }
+    @keyframes searchSpin { to { transform: rotate(360deg); } }
+    .search-progress-title { font-weight: 800; font-size: .98rem; margin-bottom: 6px; }
+    .search-progress-text { color: var(--text-sub); font-size: .76rem; min-height: 20px; }
+    .search-progress-track {
+      height: 7px; margin-top: 15px; border-radius: 99px; overflow: hidden;
+      background: var(--border-color);
+    }
+    .search-progress-bar {
+      width: 0%; height: 100%; border-radius: inherit; background: var(--primary);
+      transition: width .18s ease;
+    }
+    .search-no-match {
+      padding: 18px 12px; text-align: center; color: var(--text-sub);
+      border: 1px dashed var(--border-color); border-radius: 14px; margin-top: 8px;
+    }
+    .link-profile-group {
+      border: 1.5px solid var(--border-color); border-radius: 14px; overflow: hidden;
+      background: var(--card-bg); margin-bottom: 12px;
+    }
+    .link-profile-group-header {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: rgba(99,102,241,.07); border-bottom: 1px solid var(--border-color);
+      font-weight: 800;
+    }
+    .link-profile-group-header img {
+      width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);
+    }
+    .link-profile-group-body { display: flex; flex-direction: column; gap: 7px; padding: 9px; }
+    .link-profile-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 9px 10px; border: 1px solid var(--border-color); border-radius: 10px;
+    }
+    .draft-save-indicator {
+      display: inline-flex; align-items: center; gap: 6px; font-size: .68rem; color: var(--text-sub);
+      margin-left: auto; opacity: 0; transition: opacity .2s ease;
+    }
+    .draft-save-indicator.show { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      #search-progress-overlay *, .mini-card { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body data-theme="light" data-view="mobile">
+  <div id="search-progress-overlay" aria-live="polite" aria-busy="false">
+    <div class="search-progress-card">
+      <div class="search-progress-icon spinning"><i class="fa-solid fa-magnifying-glass"></i></div>
+      <div class="search-progress-title" id="search-progress-title">Searching…</div>
+      <div class="search-progress-text" id="search-progress-text">Preparing search</div>
+      <div class="search-progress-track"><div class="search-progress-bar" id="search-progress-bar"></div></div>
+    </div>
+  </div>
+
+
+  <!-- Setup Screen -->
+  <div id="setup-screen" style="display: none;">
+    <div class="login-box">
+      <div class="login-icon-bubble"><i class="fa-solid fa-vault"></i></div>
+      <div class="crypto-badge"><i class="fa-solid fa-shield-halved"></i> Zero-Knowledge Vault</div>
+      <h2 style="margin-bottom: 6px; font-size: 1.35rem; font-weight: 800;">Create Private Vault</h2>
+      <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 20px;">
+        Set your confidential User ID, Master Password and a Secret Recovery Key.
+      </p>
+
+      <form onsubmit="handleInitialSetup(event)">
+        <input type="text" id="setup-id" class="input-field" placeholder="Create User ID" required autocomplete="off">
+        <div class="password-wrapper">
+          <input type="password" id="setup-pass" class="input-field" placeholder="Create Master Password" minlength="6" oninput="updatePasswordStrength(this.value, 'setup-strength-bar', 'setup-strength-text')" required autocomplete="new-password">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-setup-pass" onclick="togglePasswordVisibility('setup-pass', 'toggle-setup-pass')"></i>
+        </div>
+        <div class="strength-meter-bar"><div class="strength-progress" id="setup-strength-bar"></div></div>
+        <span class="strength-text" id="setup-strength-text">Password Strength: Enter password</span>
+
+        <div class="password-wrapper" style="margin-top: 10px;">
+          <input type="password" id="setup-pass-confirm" class="input-field" placeholder="Confirm Master Password" minlength="6" required autocomplete="new-password">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-setup-pass-confirm" onclick="togglePasswordVisibility('setup-pass-confirm', 'toggle-setup-pass-confirm')"></i>
+        </div>
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--primary); display: block; text-align: left; margin: 12px 0 4px;">
+          <i class="fa-solid fa-shield-keyhole"></i> Secret Recovery Key:
+        </label>
+        <div class="password-wrapper">
+          <input type="password" id="setup-recovery-key" class="input-field" placeholder="Secret Recovery Answer / PIN" required autocomplete="off">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-setup-rec" onclick="togglePasswordVisibility('setup-recovery-key', 'toggle-setup-rec')"></i>
+        </div>
+        <span style="font-size: 0.7rem; color: var(--text-sub); display: block; margin-bottom: 18px; text-align: left;">
+          *Used only to reset password if forgotten. Never stored in plain text.
+        </span>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 14px;">
+          <i class="fa-solid fa-key"></i> Encrypt & Create Vault
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Regular Login Screen -->
+  <div id="login-screen" style="display: none;">
+    <div class="login-box" id="login-card-box">
+      <div class="login-icon-bubble" id="login-lock-bubble"><i class="fa-solid fa-lock" id="login-lock-icon"></i></div>
+      <div id="login-logo-container"></div>
+      <div class="crypto-badge"><i class="fa-solid fa-shield-halved"></i> PBKDF2 600K + AES-GCM</div>
+      <h2 style="margin-bottom: 6px; font-size: 1.4rem; font-weight: 800;">Welcome Back</h2>
+      <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 20px;">Unlock your private decentralized database</p>
+      
+      <form onsubmit="handleLoginFormSubmit(event)">
+        <input type="text" id="login-id" class="input-field" placeholder="User ID" required autocomplete="username">
+        <div class="password-wrapper">
+          <input type="password" id="login-pass" class="input-field" placeholder="Master Password" required autocomplete="current-password" onfocus="document.getElementById('login-lock-icon').className='fa-solid fa-lock-open'" onblur="document.getElementById('login-lock-icon').className='fa-solid fa-lock'">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-login-pass" onclick="togglePasswordVisibility('login-pass', 'toggle-login-pass')"></i>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="btn-login-submit" style="width: 100%; justify-content: center; margin-top: 10px; padding: 14px;">
+          <i class="fa-solid fa-unlock"></i> Unlock Database
+        </button>
+      </form>
+
+      <button class="forgot-link-btn" onclick="openForgotScreen()">Forgot Master Password?</button>
+
+      <p id="login-err" style="color: var(--danger); font-size: 0.82rem; margin-top: 14px; display: none; font-weight: 800;">Invalid Credentials or Decryption Failed</p>
+      <p id="lockout-timer-msg" style="color: #ea580c; font-size: 0.8rem; margin-top: 10px; display: none; font-weight: 800;"></p>
+    </div>
+  </div>
+
+  <!-- Password Reset Screen -->
+  <div id="forgot-screen" style="display: none;">
+    <div class="login-box">
+      <div class="login-icon-bubble"><i class="fa-solid fa-arrows-rotate"></i></div>
+      <div class="crypto-badge"><i class="fa-solid fa-shield-halved"></i> Cryptographic Recovery</div>
+      <h2 style="margin-bottom: 8px; font-size: 1.3rem; font-weight: 800;">Reset Password</h2>
+      <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 18px;">
+        Provide your Secret Recovery Key to re-encrypt and restore access to your vault.
+      </p>
+
+      <form onsubmit="handleForgotPasswordReset(event)">
+        <div class="password-wrapper">
+          <input type="password" id="forgot-rec-key" class="input-field" placeholder="Enter Secret Recovery Key" required autocomplete="off">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-forgot-rec" onclick="togglePasswordVisibility('forgot-rec-key', 'toggle-forgot-rec')"></i>
+        </div>
+
+        <div class="password-wrapper" style="margin-bottom: 2px;">
+          <input type="password" id="forgot-new-pass" class="input-field" placeholder="New Master Password" minlength="6" oninput="updatePasswordStrength(this.value, 'forgot-strength-bar', 'forgot-strength-text')" required autocomplete="new-password">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-forgot-pass" onclick="togglePasswordVisibility('forgot-new-pass', 'toggle-forgot-pass')"></i>
+        </div>
+        <div class="strength-meter-bar"><div class="strength-progress" id="forgot-strength-bar"></div></div>
+        <span class="strength-text" id="forgot-strength-text">Password Strength: Enter password</span>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px; padding: 14px;">
+          <i class="fa-solid fa-arrows-rotate"></i> Re-Encrypt & Set Password
+        </button>
+        <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center; margin-top: 10px; padding: 11px;" onclick="backToLoginFromForgot()">
+          Cancel / Back to Sign In
+        </button>
+      </form>
+      <p id="forgot-err" style="color: var(--danger); font-size: 0.82rem; margin-top: 12px; display: none; font-weight: 800;">Invalid Recovery Key!</p>
+    </div>
+  </div>
+
+  <!-- Main Application Container -->
+  <div class="container" id="main-app" style="display: none;">
+    <header class="header">
+      <div class="brand-title-wrap">
+        <div id="app-logo-container"></div>
+        <h1 id="app-title-display"><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Bio Links</h1>
+      </div>
+      <div class="nav-actions">
+        <button class="theme-switch-btn" id="draft-quick-btn" onclick="openDraftsModal()" title="View Drafts" style="position: relative;">
+          <i class="fa-solid fa-file-pen" style="color: #f59e0b;"></i>
+          <span id="draft-badge-count" style="position: absolute; top: -4px; right: -4px; background: var(--danger); color: #fff; font-size: 0.55rem; width: 16px; height: 16px; border-radius: 50%; display: none; align-items: center; justify-content: center;">0</span>
+        </button>
+
+        <button class="theme-switch-btn" id="theme-switch-graphic-btn" onclick="toggleTheme()" title="Switch Light/Dark Mode">
+          <i class="fa-solid fa-sun" id="theme-switch-icon-graphic"></i>
+        </button>
+
+        <button class="btn btn-secondary btn-icon-only" id="screen-switch-btn" title="Switch Mobile/Desktop View" onclick="toggleScreenView()">
+          <i class="fa-solid fa-desktop" id="screen-switch-icon"></i>
+        </button>
+
+        <div class="header-search-wrap">
+          <input type="text" id="header-search-input" class="header-search-input" placeholder="Search name/link..." oninput="handleSearchInput(this.value)">
+          <input type="file" id="avatar-search-file" accept="image/*" style="display: none;" onchange="handleImageSimilaritySearch(event)">
+          <button class="btn btn-secondary btn-icon-only" title="Search by Picture / Face (Supports Any Photo)" onclick="document.getElementById('avatar-search-file').click()">
+            <i class="fa-solid fa-camera-retro" style="color: #06b6d4;"></i>
+          </button>
+          <button class="btn btn-secondary btn-icon-only" title="Search Profiles" onclick="toggleHeaderSearch()">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+          <div class="search-results-dropdown" id="search-predictive-dropdown"></div>
+        </div>
+
+        <div class="dropdown-wrapper">
+          <button class="btn btn-secondary btn-icon-only" title="Menu" onclick="toggleOptionsMenu(event)">
+            <i class="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+          
+          <div class="menu-dropdown" id="options-dropdown">
+            <button class="menu-item" id="pwa-install-item" style="display: none;" onclick="installPWA(); closeOptionsMenu();">
+              <i class="fa-solid fa-download" style="color: #f59e0b;"></i> Install App
+            </button>
+            <button class="menu-item" onclick="openCategoriesModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-tags" style="color: #10b981;"></i> Manage Categories
+            </button>
+            <button class="menu-item" onclick="openBadgeManagerModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-certificate" style="color: #f59e0b;"></i> Manage Badges
+            </button>
+            <button class="menu-item" onclick="openLogoVaultModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-images" style="color: #06b6d4;"></i> Logo & Badge Vault
+            </button>
+            <button class="menu-item" onclick="openAppearanceModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-palette" style="color: var(--primary);"></i> Theme & Customizer
+            </button>
+            <button class="menu-item" onclick="openBackupModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-cloud-arrow-up" style="color: #3b82f6;"></i> Backup & Sync Center
+            </button>
+            <button class="menu-item" onclick="openTrashModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-trash-can" style="color: #ea580c;"></i> Recycle Bin
+            </button>
+            <button class="menu-item" onclick="openSettingsModal(); closeOptionsMenu();">
+              <i class="fa-solid fa-gear" style="color: #8b5cf6;"></i> Security Settings
+            </button>
+            <div class="menu-item" style="display: flex; align-items: center; justify-content: space-between; cursor: default;" onclick="event.stopPropagation()">
+              <span style="display: flex; align-items: center; gap: 12px;"><i class="fa-solid fa-clock" style="color: #0ea5e9;"></i> Auto-Lock</span>
+              <select id="quick-autolock-select" class="input-field" style="width: 105px; margin-bottom: 0; padding: 5px 6px; font-size: 0.72rem;" onchange="updateQuickAutoLock(this.value)">
+                <option value="60000">1 Min</option>
+                <option value="120000">2 Min</option>
+                <option value="180000">3 Min</option>
+                <option value="600000">10 Min</option>
+                <option value="immediate">Immediate</option>
+              </select>
+            </div>
+            <div class="menu-divider"></div>
+            <button class="menu-item" onclick="exportToCSV(); closeOptionsMenu();">
+              <i class="fa-solid fa-file-excel" style="color: #107c41;"></i> Export CSV
+            </button>
+            <button class="menu-item" onclick="document.getElementById('import-file').click(); closeOptionsMenu();">
+              <i class="fa-solid fa-upload" style="color: #6366f1;"></i> Restore Data
+            </button>
+            <div class="menu-divider"></div>
+            <button class="menu-item danger-item" onclick="lockVault(); closeOptionsMenu();">
+              <i class="fa-solid fa-lock" style="color: var(--danger);"></i> Lock Database
+            </button>
+          </div>
+        </div>
+        <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importData(event)">
+      </div>
+    </header>
+
+    <!-- Top Stats -->
+    <div class="dashboard-top-row">
+      <div class="dashboard-stats" id="dashboard-stats-bar">
+        <div class="stat-card" onclick="showStatDetails('profiles')" title="Click to view all profiles">
+          <div class="stat-number" id="stat-total-profiles">0</div>
+          <div class="stat-label">Total Profiles</div>
+        </div>
+        <div class="stat-card" onclick="showStatDetails('links')" title="Click to view all links">
+          <div class="stat-number" id="stat-total-links">0</div>
+          <div class="stat-label">Total Links</div>
+        </div>
+        <div class="stat-card" onclick="openTrashModal()" title="Click to open Recycle Bin">
+          <div class="stat-number" id="stat-trash-count">0</div>
+          <div class="stat-label">Trash Bin</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Category Filter Bar -->
+    <div class="category-filter-wrap">
+      <div class="category-filter-bar" id="category-filter-bar"></div>
+    </div>
+
+    <!-- Profiles Grid -->
+    <div class="mini-cards-grid layout-list" id="cards-container"></div>
+
+    <!-- Bottom Add Button -->
+    <div class="bottom-add-container">
+      <button class="btn-add-bottom" onclick="openProfileModal()">
+        <i class="fa-solid fa-plus-circle"></i> Add New Profile
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating Multi-Select Toggle Button -->
+  <button id="floating-select-btn" title="Select Profiles" onclick="toggleMultiSelectMode()" style="position: fixed; bottom: 25px; right: 25px; width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: #fff; border: none; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4); z-index: 1400; cursor: pointer; transition: transform 0.2s;">
+    <i class="fa-solid fa-check-square"></i>
+  </button>
+
+  <!-- Modals -->
+  <div class="modal" id="drafts-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 800;"><i class="fa-solid fa-file-pen" style="color: #f59e0b;"></i> Saved Drafts</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('drafts-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p style="font-size: 0.76rem; color: var(--text-sub); margin-bottom: 12px;">Draft profiles ordered alphabetically by name:</p>
+      <div id="drafts-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="quick-action-modal">
+    <div class="modal-content">
+      <img id="qa-avatar" class="quick-action-avatar" src="" alt="Avatar">
+      <h3 id="qa-name" style="font-size: 1.2rem; font-weight: 800; margin-bottom: 2px;">Profile Options</h3>
+      <p id="qa-cat" style="font-size: 0.78rem; color: var(--text-sub); font-weight: 700;">Manage Profile</p>
+      
+      <div class="quick-action-buttons">
+        <button type="button" class="btn btn-primary" style="justify-content: center; padding: 13px;" onclick="executeQAView()">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Bio Page
+        </button>
+        <button type="button" class="btn btn-secondary" style="justify-content: center; padding: 13px;" onclick="executeQAEdit()">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+        </button>
+        <button type="button" class="btn btn-danger" style="justify-content: center; padding: 13px;" onclick="executeQATrash()">
+          <i class="fa-solid fa-trash-can"></i> Move to Recycle Bin
+        </button>
+        <button type="button" class="btn btn-secondary" style="justify-content: center; padding: 10px; font-size: 0.82rem;" onclick="closeModal('quick-action-modal')">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="profile-view-modal">
+    <div class="bio-view-modal-content" id="bio-view-container">
+      <button class="bio-modal-close-btn" onclick="closeModal('profile-view-modal')"><i class="fa-solid fa-xmark"></i></button>
+      <div id="bio-modal-body"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="stat-list-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="stat-modal-title" style="font-size: 1rem;"><i class="fa-solid fa-list" style="color: var(--primary);"></i> Overview List</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('stat-list-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="stat-modal-body" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="logo-vault-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-images" style="color: #06b6d4;"></i> Permanent Vault</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('logo-vault-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="vault-tabs">
+        <button class="vault-tab-btn active" id="tab-btn-links" onclick="switchVaultTab('links')">Link Icons</button>
+        <button class="vault-tab-btn" id="tab-btn-badges" onclick="switchVaultTab('badges')">Badge Icons</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+        <input type="file" id="dedicated-vault-file" accept="image/*" multiple style="font-size: 0.8rem;">
+        <button type="button" class="btn btn-primary" style="justify-content: center; padding: 11px;" onclick="addUploadsToActiveVault()">
+          <i class="fa-solid fa-upload"></i> Upload to Vault
+        </button>
+      </div>
+
+      <div class="saved-logos-grid" id="vault-items-list"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="badge-manager-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 800;"><i class="fa-solid fa-certificate" style="color: #f59e0b;"></i> Manage Status Badges</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('badge-manager-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="editor-section-card">
+        <div class="editor-section-header"><i class="fa-solid fa-plus-circle"></i> Create New Badge</div>
+        
+        <div class="badge-live-preview-box">
+          <span style="font-size: 0.72rem; color: var(--text-sub); display: block; margin-bottom: 6px; font-weight: 700;">Live Preview:</span>
+          <span id="badge-preview-pill" class="dynamic-badge-pill" style="color: #3b82f6; border-color: #3b82f660; background: #3b82f615; font-size: 0.85rem; padding: 5px 12px;">
+            <i class="fa-solid fa-certificate" id="badge-preview-icon"></i>
+            <img id="badge-preview-img" src="" class="dynamic-badge-img" style="display: none; width: 16px; height: 16px;">
+            <span id="badge-preview-text">Badge Name</span>
+          </span>
+        </div>
+
+        <input type="text" id="new-badge-name" class="input-field" placeholder="Enter Badge Title (e.g. VIP Member)" oninput="updateBadgeLivePreview()" style="margin-bottom: 10px;">
+        
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; background: var(--card-bg); border: 1.5px solid var(--border-color); padding: 7px 12px; border-radius: 12px;">
+            <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub);">Color:</label>
+            <input type="color" id="new-badge-color" value="#3b82f6" onchange="updateBadgeLivePreview()" style="border: none; width: 36px; height: 30px; cursor: pointer; border-radius: 8px; background: transparent;">
+          </div>
+          <button type="button" class="btn btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 10px;" onclick="openLogoVaultForBadgeSelect('new')">
+            <i class="fa-solid fa-image"></i> Pick Icon From Vault
+          </button>
+        </div>
+
+        <input type="hidden" id="new-badge-logo-data" value="">
+
+        <button type="button" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; font-size: 0.9rem;" onclick="addNewCustomBadge()">
+          <i class="fa-solid fa-check"></i> Save & Add Badge
+        </button>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <label style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 10px;">Your Saved Badges:</label>
+        <div id="custom-badge-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="backup-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary);"></i> Backup & Sync Center</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('backup-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.06); border: 1.5px solid var(--border-color); padding: 14px; border-radius: 16px; margin-bottom: 14px;">
+        <label style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 4px;">
+          <i class="fa-solid fa-folder-open" style="color: #10b981;"></i> Local Folder Direct Sync:
+        </label>
+        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-sub); display: block; margin-bottom: 10px;">
+          Select a dedicated folder on your device. Every change will auto-update inside that folder.
+        </span>
+        <button type="button" class="btn btn-success" style="width: 100%; justify-content: center; font-size: 0.82rem; padding: 11px;" onclick="setupDirectorySync()">
+          <i class="fa-solid fa-folder-plus"></i> Select Sync Folder
+        </button>
+        <span id="sync-folder-status" style="font-size: 0.72rem; font-weight: 700; color: #10b981; display: block; margin-top: 8px;">No folder selected</span>
+      </div>
+
+      <div style="background: rgba(99, 102, 241, 0.06); border: 1.5px solid var(--border-color); padding: 14px; border-radius: 16px; margin-bottom: 14px;">
+        <label style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 6px;">
+          <i class="fa-solid fa-rotate" style="color: var(--primary);"></i> Download Auto-Backup:
+        </label>
+        <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-sub); display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="auto-backup-toggle" style="width: 16px; height: 16px;" onchange="toggleAutoBackup(this)"> Enable Auto-Download on every save
+        </label>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn btn-primary" style="flex: 1; justify-content: center; padding: 12px;" onclick="executeManualBackup()">
+          <i class="fa-solid fa-download"></i> Manual Backup
+        </button>
+        <button type="button" class="btn btn-secondary" style="padding: 12px;" onclick="document.getElementById('import-file').click(); closeModal('backup-modal');">
+          <i class="fa-solid fa-upload"></i> Restore
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="trash-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-trash-can" style="color: #ea580c;"></i> Recycle Bin</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('trash-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p style="font-size: 0.76rem; font-weight: 600; color: var(--text-sub); margin-bottom: 12px;">Items in trash auto-clean after 30 days.</p>
+      
+      <div id="trash-list-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;"></div>
+
+      <button type="button" class="btn btn-danger" style="width: 100%; justify-content: center; font-size: 0.82rem; padding: 11px;" onclick="emptyAllTrash()">
+        <i class="fa-solid fa-trash-can"></i> Empty All Recycle Bin
+      </button>
+    </div>
+  </div>
+
+  <div class="modal" id="categories-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-tags" style="color: var(--primary);"></i> Manage Categories</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('categories-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="editor-section-card">
+        <div class="editor-section-header"><i class="fa-solid fa-plus-circle"></i> Add New Category</div>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-cat-input" class="input-field" placeholder="Enter Category Name" style="margin-bottom: 0;">
+          <button type="button" class="btn btn-primary" style="padding: 11px 18px; white-space: nowrap;" onclick="addNewCategory()">
+            <i class="fa-solid fa-plus"></i> Add
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <label style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 10px;">Existing Categories:</label>
+        <div id="category-manage-list"></div>
+      </div>
+
+      <div style="margin-top: 18px; text-align: right;">
+        <button type="button" class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 12px;" onclick="closeModal('categories-modal')">Done / Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cropper-modal">
+    <div class="cropper-studio-card">
+      <div class="cropper-studio-header">
+        <h3 id="cropper-title" style="font-size: 1.1rem; font-weight: 800; color: var(--text-main);">
+          <i class="fa-solid fa-crop-simple" style="color: var(--primary);"></i> Image Studio Editor
+        </h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeCropperModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="cropper-canvas-area">
+        <img id="cropper-image" src="" alt="Crop Target">
+      </div>
+
+      <div class="cropper-toolbar">
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioZoom(0.1)" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom +</button>
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioZoom(-0.1)" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i> Zoom -</button>
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioRotate(-90)" title="Rotate Left"><i class="fa-solid fa-rotate-left"></i> 90°</button>
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioRotate(90)" title="Rotate Right"><i class="fa-solid fa-rotate-right"></i> 90°</button>
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioFlip()" title="Flip"><i class="fa-solid fa-arrows-left-right"></i> Flip</button>
+        <button type="button" class="cropper-tool-btn" onclick="cropperStudioReset()" title="Reset"><i class="fa-solid fa-arrow-rotate-left"></i> Reset</button>
+      </div>
+
+      <div class="cropper-footer">
+        <button type="button" class="btn btn-secondary" style="padding: 12px 20px;" onclick="closeCropperModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" style="padding: 12px 26px; font-size: 0.95rem;" onclick="applyCrop()">
+          <i class="fa-solid fa-check-double"></i> Apply Crop
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="profile-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title" style="font-size: 1.15rem; font-weight: 800;"><i class="fa-solid fa-id-card" style="color: var(--primary);"></i> Profile Editor</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('profile-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="profile-form" onsubmit="saveProfile(event)">
+        <input type="hidden" id="p-id">
+        <input type="hidden" id="draft-index-key" value="">
+        
+        <div class="editor-section-card">
+          <div class="editor-section-header"><i class="fa-solid fa-camera"></i> 1. Photos & Covers</div>
+          
+          <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Top Banner Cover (16:9):</label>
+          <div class="image-selector-wrap" style="margin-bottom: 12px;">
+            <img id="preview-p-cover" class="image-preview-cover" src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80" alt="Cover">
+            <div style="flex: 1;">
+              <input type="file" id="p-cover" class="input-field" accept="image/*" style="margin-bottom: 0; font-size: 0.8rem;">
+            </div>
+          </div>
+          
+          <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Profile Avatar (1:1):</label>
+          <div class="image-selector-wrap">
+            <img id="preview-p-img" class="image-preview-thumb" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80" alt="Avatar">
+            <div style="flex: 1;">
+              <input type="file" id="p-img" class="input-field" accept="image/*" style="margin-bottom: 0; font-size: 0.8rem;">
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-section-card">
+          <div class="editor-section-header"><i class="fa-solid fa-user-tag"></i> 2. Identity & Classification</div>
+          
+          <input type="text" id="p-name" class="input-field" placeholder="Full Profile Name *" required oninput="autoSaveDraft()">
+          <input type="text" id="p-cat" class="input-field" placeholder="Headline / Bio Subtitle" oninput="autoSaveDraft()">
+
+          <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Profile Category:</label>
+          <div class="editor-field-row">
+            <select id="p-tag" class="input-field" style="margin-bottom: 0; flex: 1;" onchange="autoSaveDraft()"></select>
+            <button type="button" class="btn btn-secondary" style="padding: 12px 14px; font-size: 0.8rem;" onclick="openCategoriesModal()">
+              <i class="fa-solid fa-tags"></i> Edit List
+            </button>
+          </div>
+
+          <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Status Verification Badge:</label>
+          <div class="editor-field-row">
+            <select id="p-status-badge" class="input-field" style="margin-bottom: 0; flex: 1;" onchange="autoSaveDraft()"></select>
+            <button type="button" class="btn btn-secondary" style="padding: 12px 14px; font-size: 0.8rem;" onclick="openBadgeManagerModal()">
+              <i class="fa-solid fa-certificate"></i> Badges
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+            <div>
+              <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Card Template:</label>
+              <select id="p-template" class="input-field" style="margin-bottom: 0;" onchange="autoSaveDraft()">
+                <option value="classic">Classic Minimal</option>
+                <option value="glass">Glassmorphism Luxe</option>
+                <option value="neon">Neon Cyberpunk</option>
+                <option value="royal">Royal Gold Aura</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; padding-top: 20px;">
+              <label style="font-size: 0.82rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="p-pinned" style="width: 18px; height: 18px; accent-color: var(--primary);" onchange="autoSaveDraft()"> 📌 Pin To Top
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-section-card" style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div class="editor-section-header" style="margin-bottom: 0;"><i class="fa-solid fa-link"></i> 3. Links Stack</div>
+            <button type="button" class="btn btn-primary" style="padding: 7px 12px; font-size: 0.78rem;" onclick="addCustomLinkRow()">
+              <i class="fa-solid fa-plus"></i> Add Link
+            </button>
+          </div>
+
+          <div id="custom-links-container"></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="save-btn" style="width: 100%; justify-content: center; padding: 15px; font-size: 1rem;">
+          <i class="fa-solid fa-lock"></i> Encrypt & Save Profile
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="appearance-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 800;">🎨 Theme & UI Customizer</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('appearance-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="saveAppearance(event)">
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 8px;">8 Preset Theme Palettes:</label>
+          <div class="theme-presets-grid">
+            <div class="theme-preset-item" style="background: #4f46e5;" onclick="applyPresetTheme('#4f46e5', '#f8fafc', '#ffffff', '#0f172a')" title="Indigo">Indigo</div>
+            <div class="theme-preset-item" style="background: #10b981;" onclick="applyPresetTheme('#10b981', '#ecfdf5', '#ffffff', '#065f46')" title="Emerald">Emerald</div>
+            <div class="theme-preset-item" style="background: #f97316;" onclick="applyPresetTheme('#f97316', '#fff7ed', '#ffffff', '#9a3412')" title="Sunset">Sunset</div>
+            <div class="theme-preset-item" style="background: #ec4899;" onclick="applyPresetTheme('#ec4899', '#fdf2f8', '#ffffff', '#831843')" title="Pink">Neon</div>
+            <div class="theme-preset-item" style="background: #8b5cf6;" onclick="applyPresetTheme('#8b5cf6', '#f5f3ff', '#ffffff', '#4c1d95')" title="Purple">Royal</div>
+            <div class="theme-preset-item" style="background: #0ea5e9;" onclick="applyPresetTheme('#0ea5e9', '#f0f9ff', '#ffffff', '#0369a1')" title="Teal">Teal</div>
+            <div class="theme-preset-item" style="background: #ef4444;" onclick="applyPresetTheme('#ef4444', '#fef2f2', '#ffffff', '#991b1b')" title="Crimson">Crimson</div>
+            <div class="theme-preset-item" style="background: #334155;" onclick="applyPresetTheme('#334155', '#f8fafc', '#ffffff', '#0f172a')" title="Slate">Slate</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">App Font:</label>
+            <select id="app-font-select" class="input-field">
+              <option value="'Plus Jakarta Sans', system-ui, sans-serif">Plus Jakarta Sans</option>
+              <option value="'Inter', sans-serif">Inter Clean</option>
+              <option value="'Poppins', sans-serif">Poppins Modern</option>
+              <option value="'Roboto', sans-serif">Roboto Classic</option>
+              <option value="'Cinzel', serif">Cinzel Luxury Serif</option>
+              <option value="'Fira Code', monospace">Fira Code Tech</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">Grid Layout:</label>
+            <select id="app-layout-select" class="input-field">
+              <option value="layout-list">Comfortable List</option>
+              <option value="layout-compact">Compact List</option>
+              <option value="layout-grid">2-Column Grid</option>
+            </select>
+          </div>
+        </div>
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">App Title:</label>
+        <input type="text" id="app-title-input" class="input-field" placeholder="e.g. Bio Link Manager">
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">App Main Logo:</label>
+        <input type="file" id="app-logo-input" class="input-field" accept="image/*">
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">App Screen Background Image:</label>
+        <input type="file" id="app-bg-input" class="input-field" accept="image/*">
+
+        <div class="color-picker-row">
+          <label>Primary Theme Color:</label>
+          <input type="color" id="primary-color-input" value="#4f46e5">
+        </div>
+        <div class="color-picker-row">
+          <label>Background Color:</label>
+          <input type="color" id="bg-color-input" value="#f8fafc">
+        </div>
+        <div class="color-picker-row">
+          <label>Card Color:</label>
+          <input type="color" id="card-color-input" value="#ffffff">
+        </div>
+        <div class="color-picker-row">
+          <label>Text Color:</label>
+          <input type="color" id="text-color-input" value="#0f172a">
+        </div>
+
+        <div class="color-picker-row">
+          <label>Card Corner Radius:</label>
+          <input type="range" id="card-radius-slider" min="6" max="30" value="18" style="width: 100px;">
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 16px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center; padding: 12px;">Save Theme</button>
+          <button type="button" class="btn btn-danger" style="padding: 12px;" onclick="resetAppearance()">Reset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="settings-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; font-weight: 800;">🔐 Security Settings</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeModal('settings-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="saveSettings(event)">
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">Inactivity Auto-Lock Timer:</label>
+        <select id="set-autolock-timer" class="input-field">
+          <option value="60000">1 Minute Inactivity</option>
+          <option value="180000">3 Minutes Inactivity</option>
+          <option value="300000">5 Minutes Inactivity</option>
+          <option value="0">Disabled (Manual Lock Only)</option>
+        </select>
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">New User ID:</label>
+        <input type="text" id="set-uid" class="input-field" required>
+        
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">Current Password (Authorize change):</label>
+        <div class="password-wrapper">
+          <input type="password" id="set-old-pass" class="input-field" placeholder="Enter Current Password" required>
+        </div>
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">New Master Password:</label>
+        <div class="password-wrapper" style="margin-bottom: 2px;">
+          <input type="password" id="set-pass" class="input-field" placeholder="Enter New Password" minlength="6" oninput="updatePasswordStrength(this.value, 'settings-strength-bar', 'settings-strength-text')" required>
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-set-pass" onclick="togglePasswordVisibility('set-pass', 'toggle-set-pass')"></i>
+        </div>
+        <div class="strength-meter-bar"><div class="strength-progress" id="settings-strength-bar"></div></div>
+        <span class="strength-text" id="settings-strength-text" style="margin-bottom: 12px;">Password Strength: Enter password</span>
+
+        <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-sub);">Update Secret Recovery Key (Optional):</label>
+        <div class="password-wrapper">
+          <input type="password" id="set-rec-key" class="input-field" placeholder="Leave blank to keep current key">
+          <i class="fa-solid fa-eye toggle-pass-btn" id="toggle-set-rec" onclick="togglePasswordVisibility('set-rec-key', 'toggle-set-rec')"></i>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px; padding: 13px;">Re-Encrypt & Update Vault</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Multi-Descriptor Face Recognition Engine (Supports matching via any photo or angle)
+    let faceModelsPromise = null;
+    const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
+    const FACE_STRONG_MATCH_THRESHOLD = 0.62; // relaxed face-distance threshold for alternate photos
+    const FACE_MIN_MARGIN = 0.015;
+    const FACE_DETECT_MIN_CONFIDENCE = 0.42;
+    const FACE_QUERY_MIN_CONFIDENCE = 0.42;
+    const FACE_INPUT_SIZE = 608;
+    const FACE_DESCRIPTOR_VERSION = 4;
+
+    async function ensureFaceModelsLoaded() {
+      if (faceModelsPromise) return faceModelsPromise;
+      if (!window.faceapi) throw new Error('Face recognition engine could not be loaded.');
+      faceModelsPromise = Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
+      ]).catch(err => {
+        faceModelsPromise = null;
+        throw err;
+      });
+      return faceModelsPromise;
+    }
+
+    function loadImageElement(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image could not be loaded.'));
+        img.src = src;
+      });
+    }
+
+    function largestFace(detections) {
+      if (!detections || !detections.length) return null;
+      return detections.reduce((best, current) => {
+        const a = current.detection.box;
+        const b = best.detection.box;
+        return (a.width * a.height) > (b.width * b.height) ? current : best;
+      });
+    }
+
+    // UPDATED FUNCTION: Image Pre-processing for better detection
+    async function createFaceDescriptorFromSource(src, minConfidence = FACE_DETECT_MIN_CONFIDENCE) {
+      await ensureFaceModelsLoaded();
+      const img = typeof src === 'string' ? await loadImageElement(src) : src;
+      
+      const MAX_SIZE = 800;
+      let width = img.naturalWidth;
+      let height = img.naturalHeight;
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const scale = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+        width *= scale;
+        height *= scale;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+
+      const options = new faceapi.SsdMobilenetv1Options({
+        minConfidence,
+        inputSize: FACE_INPUT_SIZE
+      });
+      const detections = await faceapi
+        .detectAllFaces(canvas, options)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+
+      if (!detections.length) return null;
+
+      if (detections.length > 1) {
+        const sorted = [...detections].sort((a, b) =>
+          (b.detection.box.width * b.detection.box.height) -
+          (a.detection.box.width * a.detection.box.height)
+        );
+        const largestArea = sorted[0].detection.box.width * sorted[0].detection.box.height;
+        const secondArea = sorted[1].detection.box.width * sorted[1].detection.box.height;
+        if (secondArea / largestArea > 0.62) return { ambiguous: true };
+      }
+
+      const face = largestFace(detections);
+      return face ? Array.from(face.descriptor) : null;
+    }
+
+    const faceDescriptorJobs = new Map();
+
+    async function getProfileFaceDescriptors(profile) {
+      if (!profile || !profile.img) return [];
+      const cacheKey = `${profile.id}:${profile.faceDescriptorVersion || 0}:${Array.isArray(profile.faceDescriptors) ? profile.faceDescriptors.length : 0}`;
+      const cached = faceDescriptorCache.get(cacheKey);
+      if (cached) return cached;
+
+      if (!Array.isArray(profile.faceDescriptors)) {
+        profile.faceDescriptors = [];
+        if (Array.isArray(profile.faceDescriptor) && profile.faceDescriptor.length === 128) {
+          profile.faceDescriptors.push(profile.faceDescriptor);
+        }
+      }
+
+      if (profile.faceDescriptors.length > 0 && profile.faceDescriptorVersion === FACE_DESCRIPTOR_VERSION) {
+        const result = profile.faceDescriptors.map(d => new Float32Array(d));
+        faceDescriptorCache.set(cacheKey, result);
+        return result;
+      }
+
+      if (faceDescriptorJobs.has(profile.id)) return faceDescriptorJobs.get(profile.id);
+
+      const job = (async () => {
+        const descriptor = await createFaceDescriptorFromSource(profile.img, FACE_DETECT_MIN_CONFIDENCE);
+        if (Array.isArray(descriptor) && descriptor.length === 128) {
+          const exists = profile.faceDescriptors.some(d =>
+            faceDistance(new Float32Array(d), new Float32Array(descriptor)) < 0.08
+          );
+          if (!exists) {
+            profile.faceDescriptors.push(descriptor);
+            if (profile.faceDescriptors.length > 5) profile.faceDescriptors.shift();
+          }
+          profile.faceDescriptorVersion = FACE_DESCRIPTOR_VERSION;
+
+          // Persist in the background. Do NOT make image search wait for disk encryption.
+          queueMicrotask(async () => {
+            try {
+              const encryptedPayload = await encryptObject(profile, masterCryptoKey);
+              const tx = db.transaction("vault", "readwrite");
+              tx.objectStore("vault").put({ id: Number(profile.id), encrypted: encryptedPayload });
+            } catch (err) {
+              console.warn('Could not persist face descriptor in background:', err);
+            }
+          });
+        }
+        const result = profile.faceDescriptors.map(d => new Float32Array(d));
+        faceDescriptorCache.set(`${profile.id}:${profile.faceDescriptorVersion || 0}:${profile.faceDescriptors.length}`, result);
+        return result;
+      })().finally(() => faceDescriptorJobs.delete(profile.id));
+
+      faceDescriptorJobs.set(profile.id, job);
+      return job;
+    }
+
+    function faceDistance(a, b) {
+      let sum = 0;
+      const len = Math.min(a.length, b.length);
+      for (let i = 0; i < len; i++) {
+        const d = a[i] - b[i];
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+
+    // Search progress helpers: shared by text and image search.
+    let searchOverlayTimer = null;
+    function showSearchProgress(title, text = '', percent = 8) {
+      const overlay = document.getElementById('search-progress-overlay');
+      if (!overlay) return;
+      clearTimeout(searchOverlayTimer);
+      overlay.classList.add('show');
+      overlay.setAttribute('aria-busy', 'true');
+      document.getElementById('search-progress-title').textContent = title;
+      document.getElementById('search-progress-text').textContent = text;
+      document.getElementById('search-progress-bar').style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    }
+    function updateSearchProgress(text, percent) {
+      const t = document.getElementById('search-progress-text');
+      const b = document.getElementById('search-progress-bar');
+      if (t) t.textContent = text;
+      if (b) b.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    }
+    function hideSearchProgress(delay = 120) {
+      clearTimeout(searchOverlayTimer);
+      searchOverlayTimer = setTimeout(() => {
+        const overlay = document.getElementById('search-progress-overlay');
+        if (!overlay) return;
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-busy', 'false');
+      }, delay);
+    }
+
+    // Cache descriptor arrays in memory so repeated searches do not redo work.
+    const faceDescriptorCache = new Map();
+
+    // UPDATED FUNCTION: Simple multi-result Face Search.
+    // A profile's PROFILE PHOTO is the reference. Search returns every profile
+    // whose face distance is within the relaxed 60–80% similarity range.
+    async function handleImageSimilaritySearch(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      showSearchProgress('Image search', 'Reading the face from your photo…', 8);
+      const queryUrl = URL.createObjectURL(file);
+
+      try {
+        const queryDescriptor = await createFaceDescriptorFromSource(
+          queryUrl,
+          FACE_QUERY_MIN_CONFIDENCE
+        );
+
+        if (!queryDescriptor) {
+          alert('ছবিতে স্পষ্ট মুখ শনাক্ত করা যায়নি। অন্য একটি পরিষ্কার ছবি ব্যবহার করুন।');
+          return;
+        }
+
+        if (queryDescriptor.ambiguous) {
+          alert('ছবিতে একাধিক মুখ পাওয়া গেছে। শুধুমাত্র একজনের ছবি দিন।');
+          return;
+        }
+
+        const profiles = allProfiles.filter(p => p && p.img);
+        if (!profiles.length) {
+          alert('কোনো প্রোফাইল নেই।');
+          return;
+        }
+
+        const matches = [];
+        let cursor = 0;
+        const workerCount = Math.min(3, profiles.length);
+
+        async function worker() {
+          while (true) {
+            const index = cursor++;
+            if (index >= profiles.length) return;
+
+            const profile = profiles[index];
+
+            try {
+              // Use the stored descriptor generated from the profile photo.
+              // If it does not exist yet, generate it from that SAME profile photo.
+              const descriptors = await getProfileFaceDescriptors(profile);
+
+              let bestDistance = Infinity;
+              for (const desc of (descriptors || [])) {
+                if (!desc || desc.length !== 128) continue;
+                const distance = faceDistance(queryDescriptor, desc);
+                if (distance < bestDistance) bestDistance = distance;
+              }
+
+              // IMPORTANT: do not choose one "closest" profile.
+              // Keep EVERY profile inside the matching threshold.
+              if (Number.isFinite(bestDistance) &&
+                  bestDistance <= FACE_STRONG_MATCH_THRESHOLD) {
+                const similarity = Math.max(
+                  0,
+                  Math.min(100, Math.round((1 - bestDistance / 1.0) * 100))
+                );
+                matches.push({ profile, distance: bestDistance, similarity });
+              }
+            } catch (err) {
+              console.warn('Face search candidate skipped:', profile.id, err);
+            }
+
+            updateSearchProgress(
+              `Scanning ${Math.min(cursor, profiles.length)} of ${profiles.length} profile photos…`,
+              12 + Math.round((Math.min(cursor, profiles.length) / profiles.length) * 78)
+            );
+
+            await new Promise(requestAnimationFrame);
+          }
+        }
+
+        await Promise.all(Array.from({ length: workerCount }, worker));
+
+        matches.sort((a, b) => a.distance - b.distance);
+
+        updateSearchProgress(
+          matches.length
+            ? `${matches.length} matching profile${matches.length === 1 ? '' : 's'} found`
+            : 'No matching profile found',
+          100
+        );
+
+        if (!matches.length) {
+          alert('কোনো matching profile পাওয়া যায়নি।');
+          return;
+        }
+
+        // Show ALL matching profiles together, ordered from strongest to weakest.
+        const modal = document.getElementById('stat-list-modal');
+        const titleEl = document.getElementById('stat-modal-title');
+        const bodyEl = document.getElementById('stat-modal-body');
+
+        if (modal && titleEl && bodyEl) {
+          titleEl.innerHTML =
+            `<i class="fa-solid fa-face-smile" style="color: var(--primary);"></i> ` +
+            `Face Search Results (${matches.length})`;
+
+          bodyEl.innerHTML = '';
+
+          matches.forEach((match, index) => {
+            const p = match.profile;
+            const row = document.createElement('div');
+            row.style.cssText =
+              "display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:8px;" +
+              "background:rgba(0,0,0,0.02);border:1px solid var(--border-color);" +
+              "border-radius:10px;cursor:pointer;";
+
+            const img = p.img
+              ? `<img src="${p.img}" loading="lazy" decoding="async" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">`
+              : `<div style="width:44px;height:44px;border-radius:50%;background:var(--border-color);"></div>`;
+
+            row.innerHTML =
+              `${img}` +
+              `<div style="flex:1;min-width:0;">` +
+                `<div style="font-weight:700;font-size:.86rem;">${index + 1}. ${escapeHtml(p.name || 'Profile')}</div>` +
+                `<div style="font-size:.70rem;color:var(--text-sub);">${escapeHtml(p.tag || p.cat || 'Profile')} • ${match.similarity}% face similarity</div>` +
+              `</div>` +
+              `<i class="fa-solid fa-chevron-right" style="color:var(--text-sub);"></i>`;
+
+            row.onclick = () => {
+              document.getElementById('stat-list-modal').style.display = 'none';
+              openBioModal(p.id);
+              replaceModalHistory('profile-view-modal');
+            };
+
+            bodyEl.appendChild(row);
+          });
+
+          modal.style.display = 'flex';
+          pushModalHistory('stat-list-modal');
+        } else {
+          // Safe fallback if the statistics modal is unavailable.
+          openBioModal(matches[0].profile.id);
+        }
+      } catch (err) {
+        console.error('Image similarity search failed:', err);
+        alert('ইমেজ সার্চ সম্পন্ন করা সম্ভব হয়নি।');
+      } finally {
+        URL.revokeObjectURL(queryUrl);
+        e.target.value = '';
+        hideSearchProgress(180);
+      }
+    }
+
+    const PBKDF2_ITERATIONS = 600000;
+    const VERIFY_CANARY_TEXT = "VAULT_INTEGRITY_VERIFIED_2026";
+    let db;
+    let masterCryptoKey = null;
+    let allProfiles = [];
+    let profilesLoadToken = 0;
+    let currentCategoryFilter = 'All';
+    let directoryHandle = null;
+
+    let activeVaultTab = 'links';
+    let selectingBadgeTargetIndex = null;
+    let tempBadgeDraftName = '';
+    let tempBadgeDraftColor = '#3b82f6';
+
+    let currentAvatarBase64 = "";
+    let currentCoverBase64 = "";
+
+    let customAppLogoBase64 = localStorage.getItem('pm_app_logo') || "";
+    let customAppBgBase64 = localStorage.getItem('pm_app_bg') || "";
+
+    let sortableLinksInstance = null;
+    let failedAttempts = 0;
+    let lockoutUntil = 0;
+    let currentQAProfileId = null;
+
+    let isMultiSelectMode = false;
+    let selectedProfileIds = new Set();
+
+    let inactivityTimer = null;
+    let lastActivityAt = 0;
+    function resetInactivityTimer() {
+      const now = Date.now();
+      // Mousemove/scroll can fire hundreds of times per second on mobile/desktop.
+      if (now - lastActivityAt < 1000) return;
+      lastActivityAt = now;
+
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      const setting = localStorage.getItem('pm_autolock_setting') || '600000';
+      if (setting === 'immediate') return;
+      const timerMs = Number(setting);
+      if (timerMs > 0 && masterCryptoKey) {
+        inactivityTimer = setTimeout(() => lockVault(), timerMs);
+      }
+    }
+
+    function updateQuickAutoLock(val) {
+      localStorage.setItem('pm_autolock_setting', val);
+      if (val !== 'immediate') {
+        localStorage.setItem('pm_autolock_ms', val);
+      }
+      resetInactivityTimer();
+    }
+
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+      window.addEventListener(evt, resetInactivityTimer, { passive: true });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        document.body.classList.add('privacy-blurred');
+        // Do not destroy the session merely because the browser tab was hidden.
+        // The configured inactivity timer remains the single lock mechanism.
+      } else {
+        document.body.classList.remove('privacy-blurred');
+        resetInactivityTimer();
+      }
+    });
+
+    let draftMemoryCache = null;
+    let draftSaveTimer = null;
+    let draftSaveDirty = false;
+    // Stable UI/draft state: keeps modal navigation and draft persistence deterministic.
+    let draftCaptureSuspended = false;
+    let activeResumedDraftKey = null;
+    let modalHistoryLock = false;
+    let activeModalHistory = null;
+
+    function pushModalHistory(id) {
+      if (modalHistoryLock) return;
+      const current = history.state && history.state.__bioVaultModal;
+      if (current === id) {
+        activeModalHistory = id;
+        return;
+      }
+      history.pushState({ ...(history.state || {}), __bioVaultModal: id }, '');
+      activeModalHistory = id;
+    }
+
+    function replaceModalHistory(id) {
+      history.replaceState({ ...(history.state || {}), __bioVaultModal: id }, '');
+      activeModalHistory = id;
+    }
+
+    function closeModal(id, fromPopState = false) {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      // Capture a new-profile draft before the editor disappears. Saved/edited profiles
+      // are never captured because p-id is populated or draftCaptureSuspended is true.
+      if (id === 'profile-modal' && !draftCaptureSuspended) {
+        try { captureDraftSnapshot(true); } catch (err) { console.warn('Draft close capture failed:', err); }
+        flushDraftSave();
+      }
+
+      el.style.display = 'none';
+
+      if (!fromPopState && activeModalHistory === id && history.state && history.state.__bioVaultModal === id) {
+        modalHistoryLock = true;
+        activeModalHistory = null;
+        history.back();
+        setTimeout(() => { modalHistoryLock = false; }, 0);
+      } else if (fromPopState) {
+        activeModalHistory = null;
+      }
+    }
+
+    window.addEventListener('popstate', () => {
+      const stateModal = history.state && history.state.__bioVaultModal;
+      const modalIds = ['profile-modal','profile-view-modal','drafts-modal','quick-action-modal','stat-list-modal'];
+      modalIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.style.display === 'flex' && id !== stateModal) closeModal(id, true);
+      });
+      activeModalHistory = stateModal || null;
+    });
+
+    function getStoredDrafts() {
+      if (draftMemoryCache) return draftMemoryCache;
+      try {
+        draftMemoryCache = JSON.parse(localStorage.getItem('pm_profile_drafts') || '[]');
+      } catch (err) {
+        console.warn('Draft storage was invalid; resetting draft cache.', err);
+        draftMemoryCache = [];
+      }
+      return draftMemoryCache;
+    }
+
+    function commitStoredDrafts() {
+      if (!draftMemoryCache || !draftSaveDirty) return;
+      try {
+        localStorage.setItem('pm_profile_drafts', JSON.stringify(draftMemoryCache));
+        draftSaveDirty = false;
+        updateDraftBadgeCount();
+      } catch (err) {
+        console.error('Draft save failed:', err);
+      }
+    }
+
+    function saveStoredDrafts(list, immediate = false) {
+      draftMemoryCache = Array.isArray(list) ? list : [];
+      draftSaveDirty = true;
+      clearTimeout(draftSaveTimer);
+      if (immediate) {
+        commitStoredDrafts();
+        return;
+      }
+      // One localStorage write after the user pauses, instead of one write per keystroke.
+      draftSaveTimer = setTimeout(commitStoredDrafts, 700);
+      updateDraftBadgeCount();
+    }
+
+    function flushDraftSave() {
+      clearTimeout(draftSaveTimer);
+      commitStoredDrafts();
+    }
+
+    function updateDraftBadgeCount() {
+      const drafts = getStoredDrafts();
+      const badge = document.getElementById('draft-badge-count');
+      if (!badge) return;
+      if (drafts.length > 0) {
+        badge.innerText = drafts.length;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    let draftAutoSaveTimer = null;
+    function autoSaveDraft() {
+      clearTimeout(draftAutoSaveTimer);
+      draftAutoSaveTimer = setTimeout(captureDraftSnapshot, 650);
+    }
+
+    function captureDraftSnapshot(force = false) {
+      if (draftCaptureSuspended && !force) return;
+      const idVal = document.getElementById('p-id').value;
+      if (idVal) return;
+
+      const nameVal = document.getElementById('p-name').value.trim();
+      const catVal = document.getElementById('p-cat').value.trim();
+      if (!nameVal && !catVal) return;
+
+      const customLinks = [];
+      document.querySelectorAll('.custom-link-row').forEach(row => {
+        const title = row.querySelector('.link-title-input').value.trim();
+        const url = row.querySelector('.link-url-input').value.trim();
+        const iconData = row.querySelector('.link-icon-data').value;
+        const expiryDate = row.querySelector('.link-expiry-input').value;
+        if (title || url) customLinks.push({ title, url, iconData, expiryDate });
+      });
+
+      const draftObj = {
+        draftKey: document.getElementById('draft-index-key').value || ('draft_' + Date.now()),
+        name: nameVal || 'Untitled Profile',
+        cat: catVal,
+        tag: document.getElementById('p-tag').value,
+        statusBadge: document.getElementById('p-status-badge').value,
+        template: document.getElementById('p-template').value,
+        pinned: document.getElementById('p-pinned').checked,
+        links: customLinks,
+        img: currentAvatarBase64,
+        cover: currentCoverBase64,
+        updatedAt: Date.now()
+      };
+
+      document.getElementById('draft-index-key').value = draftObj.draftKey;
+
+      const drafts = getStoredDrafts();
+      const existingIdx = drafts.findIndex(d => d.draftKey === draftObj.draftKey);
+      if (existingIdx >= 0) drafts[existingIdx] = draftObj;
+      else drafts.push(draftObj);
+
+      drafts.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'accent' }));
+      saveStoredDrafts(drafts, true);
+    }
+
+
+    function openDraftsModal() {
+      flushDraftSave();
+      renderDraftsList();
+      document.getElementById('drafts-modal').style.display = 'flex';
+      pushModalHistory('drafts-modal');
+    }
+
+    function renderDraftsList() {
+      const drafts = getStoredDrafts();
+      drafts.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'accent' }));
+      
+      const container = document.getElementById('drafts-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (drafts.length === 0) {
+        container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-sub); text-align: center; padding: 20px 0;">No saved drafts found.</span>`;
+        return;
+      }
+
+      drafts.forEach(d => {
+        const item = document.createElement('div');
+        item.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: rgba(0,0,0,0.02); border: 1.5px solid var(--border-color); border-radius: 12px;";
+        item.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1; cursor: pointer;" onclick="loadDraft('${d.draftKey}')">
+            <img src="${d.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;">
+            <div style="display: flex; flex-direction: column; overflow: hidden;">
+              <span style="font-weight: 800; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(d.name)}</span>
+              <span style="font-size: 0.7rem; color: var(--text-sub);">${escapeHtml(d.cat || d.tag || 'Draft')}</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-primary" style="padding: 6px 10px; font-size: 0.75rem;" onclick="loadDraft('${d.draftKey}')">Resume</button>
+            <button class="btn btn-danger" style="padding: 6px 10px; font-size: 0.75rem;" onclick="deleteDraft('${d.draftKey}')"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function loadDraft(draftKey) {
+      flushDraftSave();
+      clearTimeout(draftAutoSaveTimer);
+      const drafts = getStoredDrafts();
+      const d = drafts.find(x => x.draftKey === draftKey);
+      if (!d) return;
+
+      activeResumedDraftKey = d.draftKey;
+      document.getElementById('drafts-modal').style.display = 'none';
+      draftCaptureSuspended = true;
+      openProfileModal();
+      replaceModalHistory('profile-modal');
+      document.getElementById('p-id').value = '';
+      document.getElementById('draft-index-key').value = d.draftKey;
+      document.getElementById('p-name').value = d.name === 'Untitled Profile' ? '' : d.name;
+      document.getElementById('p-cat').value = d.cat || '';
+      populateCategoryDropdown(d.tag || '');
+      populateBadgeDropdown(d.statusBadge || 'none');
+      document.getElementById('p-template').value = d.template || 'classic';
+      document.getElementById('p-pinned').checked = !!d.pinned;
+
+      currentAvatarBase64 = d.img || '';
+      currentCoverBase64 = d.cover || '';
+      if (currentAvatarBase64) document.getElementById('preview-p-img').src = currentAvatarBase64;
+      if (currentCoverBase64) document.getElementById('preview-p-cover').src = currentCoverBase64;
+
+      const container = document.getElementById('custom-links-container');
+      container.innerHTML = '';
+      if (d.links && d.links.length > 0) {
+        d.links.forEach(l => addCustomLinkRow(l.title, l.url, l.iconData, l.expiryDate));
+      } else {
+        addCustomLinkRow('', '');
+      }
+      draftCaptureSuspended = false;
+      updateDraftBadgeCount();
+    }
+
+    function deleteDraft(draftKey) {
+      let drafts = getStoredDrafts();
+      drafts = drafts.filter(x => x.draftKey !== draftKey);
+      saveStoredDrafts(drafts);
+      renderDraftsList();
+    }
+
+    function updatePasswordStrength(password, barId, textId) {
+      const bar = document.getElementById(barId);
+      const text = document.getElementById(textId);
+      if (!bar || !text) return;
+
+      let score = 0;
+      if (!password) {
+        bar.style.width = '0%';
+        text.innerText = "Password Strength: Enter password";
+        return;
+      }
+      if (password.length >= 6) score++;
+      if (password.length >= 10) score++;
+      if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+      if (/[0-9]/.test(password)) score++;
+      if (/[^A-Za-z0-9]/.test(password)) score++;
+
+      let width = '20%';
+      let color = '#ef4444';
+      let msg = 'Very Weak';
+
+      if (score === 2) { width = '40%'; color = '#f97316'; msg = 'Weak'; }
+      else if (score === 3) { width = '60%'; color = '#eab308'; msg = 'Medium'; }
+      else if (score === 4) { width = '80%'; color = '#10b981'; msg = 'Strong'; }
+      else if (score >= 5) { width = '100%'; color = '#059669'; msg = 'Very Strong'; }
+
+      bar.style.width = width;
+      bar.style.backgroundColor = color;
+      text.innerText = `Password Strength: ${msg}`;
+    }
+
+    function toggleScreenView() {
+      const current = document.body.getAttribute('data-view') || 'mobile';
+      const next = current === 'mobile' ? 'desktop' : 'mobile';
+
+      document.body.classList.add('zoom-transition');
+      setTimeout(() => {
+        document.body.setAttribute('data-view', next);
+        localStorage.setItem('pm_screen_view', next);
+        updateScreenSwitchIcon(next);
+        setTimeout(() => {
+          document.body.classList.remove('zoom-transition');
+        }, 100);
+      }, 250);
+    }
+    function updateScreenSwitchIcon(viewMode) {
+      const icon = document.getElementById('screen-switch-icon');
+      const btn = document.getElementById('screen-switch-btn');
+      if (viewMode === 'desktop') {
+        icon.className = 'fa-solid fa-mobile-screen-button';
+        btn.title = "Switch to Mobile View";
+      } else {
+        icon.className = 'fa-solid fa-desktop';
+        btn.title = "Switch to Desktop View";
+      }
+    }
+    function loadScreenView() {
+      const savedView = localStorage.getItem('pm_screen_view') || 'mobile';
+      document.body.setAttribute('data-view', savedView);
+      updateScreenSwitchIcon(savedView);
+    }
+
+    async function deriveKey(password, salt) {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]);
+      return crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptObject(obj, key) {
+      const enc = new TextEncoder();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(JSON.stringify(obj)));
+      return { iv: Array.from(iv), data: Array.from(new Uint8Array(ciphertext)) };
+    }
+
+    async function decryptObject(encryptedPayload, key) {
+      const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(encryptedPayload.iv) }, key, new Uint8Array(encryptedPayload.data));
+      return JSON.parse(new TextDecoder().decode(decrypted));
+    }
+
+    function initDB(callback) {
+      const request = indexedDB.open("ZeroKnowledgeBioVault_V23", 1);
+      request.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains("vault")) {
+          database.createObjectStore("vault", { keyPath: "id", autoIncrement: true });
+        }
+        if (!database.objectStoreNames.contains("trash")) {
+          database.createObjectStore("trash", { keyPath: "id", autoIncrement: true });
+        }
+      };
+      request.onsuccess = (e) => {
+        db = e.target.result;
+        autoCleanTrashBin();
+        if (callback) callback();
+      };
+      request.onerror = () => { console.error("IndexedDB error"); };
+    }
+
+    function autoCleanTrashBin() {
+      if (!db) return;
+      try {
+        const tx = db.transaction("trash", "readwrite");
+        const store = tx.objectStore("trash");
+        const req = store.getAll();
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        req.onsuccess = (e) => {
+          const list = e.target.result || [];
+          list.forEach(item => {
+            if (item.trashedAt && (now - item.trashedAt > thirtyDaysMs)) {
+              store.delete(item.id);
+            }
+          });
+          updateDashboardStats();
+        };
+      } catch (err) {
+        console.error("Auto clean trash error", err);
+      }
+    }
+
+    async function updateDashboardStats() {
+      const totalProfilesEl = document.getElementById('stat-total-profiles');
+      const totalLinksEl = document.getElementById('stat-total-links');
+      const trashCountEl = document.getElementById('stat-trash-count');
+
+      if (!totalProfilesEl) return;
+
+      totalProfilesEl.innerText = allProfiles.length;
+
+      let linkCount = 0;
+      allProfiles.forEach(p => {
+        if (p.links) linkCount += p.links.length;
+      });
+      totalLinksEl.innerText = linkCount;
+
+      if (db) {
+        try {
+          const tx = db.transaction("trash", "readonly");
+          const store = tx.objectStore("trash");
+          const req = store.count();
+          req.onsuccess = () => {
+            trashCountEl.innerText = req.result || 0;
+          };
+          req.onerror = () => { trashCountEl.innerText = 0; };
+        } catch (e) {
+          trashCountEl.innerText = 0;
+        }
+      }
+    }
+
+    function showStatDetails(type) {
+      const modal = document.getElementById('stat-list-modal');
+      const titleEl = document.getElementById('stat-modal-title');
+      const bodyEl = document.getElementById('stat-modal-body');
+      bodyEl.innerHTML = '';
+
+      if (type === 'profiles') {
+        titleEl.innerHTML = `<i class="fa-solid fa-user-shield" style="color: var(--primary);"></i> All Profiles List (${allProfiles.length})`;
+        if (allProfiles.length === 0) {
+          bodyEl.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-sub); text-align: center;">No profiles found.</span>`;
+        } else {
+          allProfiles.forEach(p => {
+            const div = document.createElement('div');
+            div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: rgba(0,0,0,0.02); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer;";
+            div.innerHTML = `<span style="font-weight: 600; font-size: 0.85rem;">${escapeHtml(p.name)}</span><span style="font-size: 0.72rem; color: var(--text-sub);">${escapeHtml(p.tag || 'Profile')}</span>`;
+            div.onclick = () => { closeModal('stat-list-modal'); openBioModal(p.id); };
+            bodyEl.appendChild(div);
+          });
+        }
+      } else if (type === 'links') {
+        let totalLinks = 0;
+        const profilesWithLinks = allProfiles.filter(p => Array.isArray(p.links) && p.links.length);
+        profilesWithLinks.forEach(p => {
+          totalLinks += p.links.length;
+          const group = document.createElement('div');
+          group.className = 'link-profile-group';
+          const avatar = p.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+          group.innerHTML = `
+            <div class="link-profile-group-header">
+              <img src="${avatar}" alt="">
+              <div style="min-width:0;">
+                <div style="font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(p.name || 'Unnamed Profile')}</div>
+                <div style="font-size:.68rem;color:var(--text-sub);font-weight:600;">${p.links.length} link${p.links.length === 1 ? '' : 's'}</div>
+              </div>
+            </div>
+            <div class="link-profile-group-body">
+              ${p.links.map(l => `
+                <div class="link-profile-row">
+                  <div style="min-width:0;">
+                    <div style="font-weight:700;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(l.title || 'Untitled link')}</div>
+                    <div style="font-size:.68rem;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(l.url || '')}</div>
+                  </div>
+                  ${l.url ? `<a href="${ensureUrl(l.url)}" target="_blank" rel="noopener noreferrer" style="font-size:.7rem;color:var(--primary);font-weight:800;white-space:nowrap;">Open</a>` : ''}
+                </div>
+              `).join('')}
+            </div>`;
+          bodyEl.appendChild(group);
+        });
+        titleEl.innerHTML = `<i class="fa-solid fa-link" style="color: var(--primary);"></i> Links by Profile (${totalLinks})`;
+        if (!profilesWithLinks.length) {
+          bodyEl.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-sub); text-align: center;">No links found.</span>`;
+        }
+      }
+      modal.style.display = 'flex';
+    }
+
+    let textSearchTimer = null;
+    function handleSearchInput(query) {
+      clearTimeout(textSearchTimer);
+      const dropdown = document.getElementById('search-predictive-dropdown');
+      const q = String(query || '').toLowerCase().trim();
+
+      if (!q) {
+        dropdown.classList.remove('show');
+        dropdown.innerHTML = '';
+        renderProfiles();
+        hideSearchProgress(0);
+        return;
+      }
+
+      showSearchProgress('Text search', `Searching profiles, categories and links for “${query}”…`, 25);
+      textSearchTimer = setTimeout(() => {
+        const matches = allProfiles.filter(p => {
+          const nameMatch = p.name && p.name.toLowerCase().includes(q);
+          const catMatch = p.cat && p.cat.toLowerCase().includes(q);
+          const tagMatch = p.tag && p.tag.toLowerCase().includes(q);
+          const linkMatch = Array.isArray(p.links) && p.links.some(l =>
+            String(l.title || '').toLowerCase().includes(q) ||
+            String(l.url || '').toLowerCase().includes(q)
+          );
+          return nameMatch || catMatch || tagMatch || linkMatch;
+        });
+
+        updateSearchProgress(`${matches.length} matching profile${matches.length === 1 ? '' : 's'} found.`, 100);
+        renderProfiles();
+
+        if (!matches.length) {
+          dropdown.innerHTML = `<div class="search-no-match"><i class="fa-solid fa-magnifying-glass"></i><br>No matching profiles for “${escapeHtml(query)}”</div>`;
+        } else {
+          dropdown.innerHTML = matches.slice(0, 20).map(p => {
+            const avatar = p.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+            const linkCount = Array.isArray(p.links) ? p.links.length : 0;
+            return `<div class="search-result-item" onclick="openBioModal(${Number(p.id)})">
+              <img src="${avatar}" class="search-res-img" alt="">
+              <div class="search-res-info">
+                <span class="search-res-name">${escapeHtml(p.name || 'Unnamed')}</span>
+                <span class="search-res-meta">${escapeHtml(p.tag || p.cat || 'Profile')} · ${linkCount} link${linkCount === 1 ? '' : 's'}</span>
+              </div>
+            </div>`;
+          }).join('');
+          dropdown.classList.add('show');
+        }
+        hideSearchProgress(180);
+      }, 120);
+    }
+
+    function selectSearchResult(id) {
+      const dropdown = document.getElementById('search-predictive-dropdown');
+      dropdown.classList.remove('show');
+      openBioModal(id);
+    }
+
+    function checkInitialization() {
+      const canary = localStorage.getItem('pm_auth_canary');
+      if (!canary) {
+        document.getElementById('setup-screen').style.display = 'flex';
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('forgot-screen').style.display = 'none';
+      } else {
+        const sessionPass = sessionStorage.getItem('pm_session_pass');
+        if (sessionPass) {
+          document.getElementById('login-id').value = localStorage.getItem('pm_user_id') || '';
+          document.getElementById('login-pass').value = sessionPass;
+          handleLogin(true);
+        } else {
+          document.getElementById('setup-screen').style.display = 'none';
+          document.getElementById('login-screen').style.display = 'flex';
+          document.getElementById('forgot-screen').style.display = 'none';
+        }
+      }
+    }
+
+    async function handleInitialSetup(e) {
+      e.preventDefault();
+      const uid = document.getElementById('setup-id').value.trim();
+      const pass = document.getElementById('setup-pass').value;
+      const passConfirm = document.getElementById('setup-pass-confirm').value;
+      const recoveryKey = document.getElementById('setup-recovery-key').value.trim();
+
+      if (pass !== passConfirm) {
+        alert("Passwords do not match!");
+        return;
+      }
+
+      const salt = crypto.getRandomValues(new Uint8Array(32));
+      const recSalt = crypto.getRandomValues(new Uint8Array(32));
+      
+      localStorage.setItem('pm_vault_salt', JSON.stringify(Array.from(salt)));
+      localStorage.setItem('pm_rec_salt', JSON.stringify(Array.from(recSalt)));
+      localStorage.setItem('pm_user_id', uid);
+      sessionStorage.setItem('pm_session_pass', pass);
+
+      const key = await deriveKey(pass, salt);
+      const recKey = await deriveKey(recoveryKey, recSalt);
+
+      const encryptedCanary = await encryptObject({ verify: VERIFY_CANARY_TEXT }, key);
+      localStorage.setItem('pm_auth_canary', JSON.stringify(encryptedCanary));
+
+      const encryptedRecovery = await encryptObject({ verify: VERIFY_CANARY_TEXT }, recKey);
+      localStorage.setItem('pm_auth_recovery', JSON.stringify(encryptedRecovery));
+
+      masterCryptoKey = key;
+      document.getElementById('setup-screen').style.display = 'none';
+      document.getElementById('main-app').style.display = 'block';
+      resetInactivityTimer();
+      ensureFavoriteCategoryExists();
+      initDB(loadProfiles);
+      alert("Private Vault successfully initialized!");
+    }
+
+    function handleLoginFormSubmit(e) {
+      e.preventDefault();
+      handleLogin(false);
+    }
+
+    async function handleLogin(isSessionAuto = false) {
+      const now = Date.now();
+      if (!isSessionAuto && now < lockoutUntil) {
+        const secs = Math.ceil((lockoutUntil - now) / 1000);
+        showLockoutMsg(`Locked due to failed attempts. Wait ${secs}s.`);
+        return;
+      }
+
+      const u = document.getElementById('login-id').value.trim();
+      const p = document.getElementById('login-pass').value;
+      const storedUid = localStorage.getItem('pm_user_id') || '';
+      const saltStr = localStorage.getItem('pm_vault_salt');
+      const canaryStr = localStorage.getItem('pm_auth_canary');
+
+      if (!saltStr || !canaryStr) {
+        checkInitialization();
+        return;
+      }
+
+      if (u !== storedUid) {
+        if (!isSessionAuto) triggerLoginErrorFeedback();
+        return;
+      }
+
+      try {
+        const salt = new Uint8Array(JSON.parse(saltStr));
+        const testKey = await deriveKey(p, salt);
+        const canaryPayload = JSON.parse(canaryStr);
+        const decryptedCanary = await decryptObject(canaryPayload, testKey);
+
+        if (decryptedCanary && decryptedCanary.verify === VERIFY_CANARY_TEXT) {
+          masterCryptoKey = testKey;
+          failedAttempts = 0;
+          sessionStorage.setItem('pm_session_pass', p);
+          
+          const loginScreen = document.getElementById('login-screen');
+          loginScreen.style.opacity = '0';
+          setTimeout(() => {
+            loginScreen.style.display = 'none';
+            loginScreen.style.opacity = '1';
+            const mainApp = document.getElementById('main-app');
+            mainApp.style.display = 'block';
+            resetInactivityTimer();
+            ensureFavoriteCategoryExists();
+            initDB(loadProfiles);
+          }, isSessionAuto ? 50 : 300);
+
+          document.getElementById('login-err').style.display = 'none';
+          document.getElementById('lockout-timer-msg').style.display = 'none';
+        } else {
+          sessionStorage.removeItem('pm_session_pass');
+          if (!isSessionAuto) triggerLoginErrorFeedback();
+        }
+      } catch (err) {
+        sessionStorage.removeItem('pm_session_pass');
+        if (!isSessionAuto) triggerLoginErrorFeedback();
+      }
+    }
+
+    function triggerLoginErrorFeedback() {
+      const box = document.getElementById('login-card-box');
+      box.classList.add('shake');
+      setTimeout(() => box.classList.remove('shake'), 400);
+
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-pass').focus();
+      recordFailedAttempt();
+    }
+
+    function openForgotScreen() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('forgot-screen').style.display = 'flex';
+      document.getElementById('forgot-rec-key').value = '';
+      document.getElementById('forgot-new-pass').value = '';
+      document.getElementById('forgot-err').style.display = 'none';
+    }
+
+    function backToLoginFromForgot() {
+      document.getElementById('forgot-screen').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+
+    async function handleForgotPasswordReset(e) {
+      e.preventDefault();
+      const recoveryKeyInput = document.getElementById('forgot-rec-key').value.trim();
+      const newPass = document.getElementById('forgot-new-pass').value;
+      const recSaltStr = localStorage.getItem('pm_rec_salt');
+      const recoveryCanaryStr = localStorage.getItem('pm_auth_recovery');
+
+      if (!recSaltStr || !recoveryCanaryStr) {
+        alert("Recovery data missing. Please re-initialize app.");
+        return;
+      }
+
+      try {
+        const recSalt = new Uint8Array(JSON.parse(recSaltStr));
+        const testRecKey = await deriveKey(recoveryKeyInput, recSalt);
+        const canaryPayload = JSON.parse(recoveryCanaryStr);
+        const decryptedCanary = await decryptObject(canaryPayload, testRecKey);
+
+        if (decryptedCanary && decryptedCanary.verify === VERIFY_CANARY_TEXT) {
+          const newSalt = crypto.getRandomValues(new Uint8Array(32));
+          const newKey = await deriveKey(newPass, newSalt);
+
+          const newCanary = await encryptObject({ verify: VERIFY_CANARY_TEXT }, newKey);
+          localStorage.setItem('pm_vault_salt', JSON.stringify(Array.from(newSalt)));
+          localStorage.setItem('pm_auth_canary', JSON.stringify(newCanary));
+
+          masterCryptoKey = newKey;
+          sessionStorage.setItem('pm_session_pass', newPass);
+          document.getElementById('forgot-screen').style.display = 'none';
+          document.getElementById('login-screen').style.display = 'flex';
+          document.getElementById('login-pass').value = newPass;
+          alert("Master password successfully reset! You can now log in.");
+        } else {
+          document.getElementById('forgot-err').style.display = 'block';
+        }
+      } catch (err) {
+        document.getElementById('forgot-err').style.display = 'block';
+      }
+    }
+
+    function recordFailedAttempt() {
+      failedAttempts++;
+      document.getElementById('login-err').style.display = 'block';
+      if (failedAttempts >= 3) {
+        const lockoutSeconds = Math.min(60, failedAttempts * 10);
+        lockoutUntil = Date.now() + lockoutSeconds * 1000;
+        showLockoutMsg(`Security Lockout: Wait ${lockoutSeconds} seconds before trying again.`);
+      }
+    }
+
+    function showLockoutMsg(msg) {
+      const el = document.getElementById('lockout-timer-msg');
+      el.innerText = msg;
+      el.style.display = 'block';
+    }
+
+    function lockVault() {
+      masterCryptoKey = null;
+      allProfiles = [];
+      sessionStorage.removeItem('pm_session_pass');
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      document.getElementById('main-app').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('login-id').value = '';
+      document.getElementById('login-pass').value = '';
+    }
+
+    function getStoredCategories() {
+      const defaultCats = ['Favorites', 'Personal', 'Business', 'Client', 'VIP'];
+      return JSON.parse(localStorage.getItem('pm_custom_categories') || JSON.stringify(defaultCats));
+    }
+
+    function saveStoredCategories(cats) {
+      localStorage.setItem('pm_custom_categories', JSON.stringify(cats));
+      renderCategoryFilterBar();
+      populateCategoryDropdown();
+      renderCategoryManageList();
+    }
+
+    function ensureFavoriteCategoryExists() {
+      let cats = getStoredCategories();
+      if (!cats.includes('Favorites')) {
+        cats.unshift('Favorites');
+        saveStoredCategories(cats);
+      }
+    }
+
+    function renderCategoryFilterBar() {
+      ensureFavoriteCategoryExists();
+      const cats = getStoredCategories();
+      const bar = document.getElementById('category-filter-bar');
+      if (!bar) return;
+
+      let html = `<div class="cat-chip ${currentCategoryFilter === 'All' ? 'active' : ''}" onclick="setCategoryFilter('All')">All</div>`;
+      cats.forEach(cat => {
+        const iconHtml = cat === 'Favorites' ? '<i class="fa-solid fa-heart" style="color: #ec4899; margin-right: 4px;"></i>' : '';
+        html += `<div class="cat-chip ${currentCategoryFilter === cat ? 'active' : ''}" onclick="setCategoryFilter('${escapeHtml(cat)}')">${iconHtml}${escapeHtml(cat)}</div>`;
+      });
+      bar.innerHTML = html;
+    }
+
+    function populateCategoryDropdown(selectedVal = '') {
+      ensureFavoriteCategoryExists();
+      const cats = getStoredCategories();
+      const select = document.getElementById('p-tag');
+      if (!select) return;
+
+      select.innerHTML = '';
+      cats.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.innerText = cat;
+        if (cat === selectedVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function openCategoriesModal() {
+      renderCategoryManageList();
+      document.getElementById('new-cat-input').value = '';
+      document.getElementById('categories-modal').style.display = 'flex';
+    }
+
+    function renderCategoryManageList() {
+      const cats = getStoredCategories();
+      const listContainer = document.getElementById('category-manage-list');
+      if (!listContainer) return;
+
+      listContainer.innerHTML = '';
+      cats.forEach((cat, index) => {
+        const row = document.createElement('div');
+        row.className = 'manager-item-card';
+        row.innerHTML = `
+          <input type="text" id="cat-edit-input-${index}" class="input-field" value="${escapeHtml(cat)}" style="margin-bottom: 0; flex: 1;" ${cat === 'Favorites' ? 'readonly title="System default category"' : ''}>
+          <div style="display: flex; gap: 6px;">
+            ${cat !== 'Favorites' ? `<button type="button" class="btn btn-secondary" style="padding: 9px 12px; font-size: 0.78rem;" onclick="renameCategory(${index})" title="Save Name"><i class="fa-solid fa-check"></i></button>` : ''}
+            ${cat !== 'Favorites' ? `<button type="button" class="btn btn-danger" style="padding: 9px 12px; font-size: 0.78rem;" onclick="deleteCategory(${index})" title="Delete"><i class="fa-solid fa-trash"></i></button>` : '<span style="font-size:0.75rem; color:var(--text-sub); padding:4px;">Protected</span>'}
+          </div>
+        `;
+        listContainer.appendChild(row);
+      });
+    }
+
+    function addNewCategory() {
+      const input = document.getElementById('new-cat-input');
+      const val = input.value.trim();
+      if (!val) return alert("Enter category name!");
+
+      const cats = getStoredCategories();
+      if (cats.includes(val)) {
+        alert("This category already exists!");
+        return;
+      }
+
+      cats.push(val);
+      saveStoredCategories(cats);
+      input.value = '';
+    }
+
+    async function renameCategory(index) {
+      const input = document.getElementById(`cat-edit-input-${index}`);
+      const newVal = input.value.trim();
+      if (!newVal) return;
+
+      const cats = getStoredCategories();
+      if (cats[index] === 'Favorites') return alert("Favorites category cannot be renamed!");
+      
+      const oldVal = cats[index];
+      if (oldVal === newVal) return;
+
+      cats[index] = newVal;
+      saveStoredCategories(cats);
+
+      if (db && masterCryptoKey) {
+        let updatedCount = 0;
+        for (const p of allProfiles) {
+          if (p.tag === oldVal) {
+            p.tag = newVal;
+            const encryptedPayload = await encryptObject(p, masterCryptoKey);
+            const tx = db.transaction("vault", "readwrite");
+            tx.objectStore("vault").put({ id: p.id, encrypted: encryptedPayload });
+            updatedCount++;
+          }
+        }
+        if (updatedCount > 0) loadProfiles();
+      }
+
+      if (currentCategoryFilter === oldVal) currentCategoryFilter = newVal;
+      alert(`Category renamed to "${newVal}"!`);
+    }
+
+    function deleteCategory(index) {
+      const cats = getStoredCategories();
+      if (cats[index] === 'Favorites') return alert("Favorites category cannot be deleted!");
+      if (cats.length <= 1) {
+        alert("You must keep at least one category.");
+        return;
+      }
+
+      const deletedCat = cats[index];
+      if (confirm(`Delete category "${deletedCat}"?`)) {
+        cats.splice(index, 1);
+        saveStoredCategories(cats);
+        if (currentCategoryFilter === deletedCat) currentCategoryFilter = 'All';
+      }
+    }
+
+    function getStoredBadges() {
+      const defaults = [
+        { id: 'none', name: 'None', color: '#9ca3af', icon: '' },
+        { id: 'verified', name: 'Verified', color: '#3b82f6', icon: '' },
+        { id: 'vip', name: 'VIP Gold', color: '#f59e0b', icon: '' },
+        { id: 'featured', name: 'Featured Star', color: '#ec4899', icon: '' }
+      ];
+      return JSON.parse(localStorage.getItem('pm_custom_status_badges') || JSON.stringify(defaults));
+    }
+
+    function saveStoredBadges(badges) {
+      localStorage.setItem('pm_custom_status_badges', JSON.stringify(badges));
+      populateBadgeDropdown();
+      renderCustomBadgeList();
+      loadProfiles();
+    }
+
+    function populateBadgeDropdown(selectedVal = 'none') {
+      const badges = getStoredBadges();
+      const select = document.getElementById('p-status-badge');
+      if (!select) return;
+      select.innerHTML = '';
+
+      badges.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.innerText = b.name;
+        if (b.id === selectedVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function updateBadgeLivePreview() {
+      const name = document.getElementById('new-badge-name').value.trim() || 'Badge Name';
+      const color = document.getElementById('new-badge-color').value;
+      const logoData = document.getElementById('new-badge-logo-data').value;
+      
+      const pill = document.getElementById('badge-preview-pill');
+      const text = document.getElementById('badge-preview-text');
+      const icon = document.getElementById('badge-preview-icon');
+      const img = document.getElementById('badge-preview-img');
+
+      text.innerText = name;
+      pill.style.color = color;
+      pill.style.borderColor = `${color}60`;
+      pill.style.background = `${color}15`;
+
+      if (logoData) {
+        img.src = logoData;
+        img.style.display = 'inline-block';
+        icon.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        icon.style.display = 'inline-block';
+      }
+    }
+
+    function openBadgeManagerModal() {
+      renderCustomBadgeList();
+      document.getElementById('new-badge-name').value = tempBadgeDraftName;
+      document.getElementById('new-badge-color').value = tempBadgeDraftColor;
+      updateBadgeLivePreview();
+      document.getElementById('badge-manager-modal').style.display = 'flex';
+    }
+
+    function renderCustomBadgeList() {
+      const badges = getStoredBadges();
+      const container = document.getElementById('custom-badge-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      badges.forEach((b, index) => {
+        if (b.id === 'none') return;
+        const row = document.createElement('div');
+        row.className = 'manager-item-card';
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+            ${b.icon ? `<img src="${b.icon}" style="width: 22px; height: 22px; object-fit: contain;">` : `<i class="fa-solid fa-certificate" style="color: ${b.color}; font-size: 1rem;"></i>`}
+            <input type="text" id="badge-name-input-${index}" class="input-field" value="${escapeHtml(b.name)}" style="margin-bottom: 0; flex: 1;">
+            <input type="color" id="badge-color-input-${index}" value="${b.color || '#3b82f6'}" onchange="saveEditedBadge(${index})" style="border:none; width:34px; height:32px; cursor:pointer; background:transparent;" title="Change Color">
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <button type="button" class="btn btn-secondary" style="padding: 9px 10px; font-size: 0.76rem;" onclick="openLogoVaultForBadgeSelect(${index})" title="Pick Icon"><i class="fa-solid fa-image"></i></button>
+            <button type="button" class="btn btn-secondary" style="padding: 9px 10px; font-size: 0.76rem;" onclick="saveEditedBadge(${index})" title="Save Changes"><i class="fa-solid fa-check"></i></button>
+            <button type="button" class="btn btn-danger" style="padding: 9px 10px; font-size: 0.76rem;" onclick="deleteCustomBadge(${index})" title="Delete"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function addNewCustomBadge() {
+      const name = document.getElementById('new-badge-name').value.trim();
+      const color = document.getElementById('new-badge-color').value;
+      const icon = document.getElementById('new-badge-logo-data').value;
+      if (!name) return alert("Enter badge name!");
+
+      const badges = getStoredBadges();
+      const id = 'badge_' + Date.now();
+      badges.push({ id, name, color, icon });
+      saveStoredBadges(badges);
+
+      tempBadgeDraftName = '';
+      tempBadgeDraftColor = '#3b82f6';
+      document.getElementById('new-badge-name').value = '';
+      document.getElementById('new-badge-logo-data').value = '';
+      updateBadgeLivePreview();
+      alert("Custom badge created successfully!");
+    }
+
+    function saveEditedBadge(index) {
+      const badges = getStoredBadges();
+      const nameInput = document.getElementById(`badge-name-input-${index}`);
+      const colorInput = document.getElementById(`badge-color-input-${index}`);
+      if (!nameInput || !colorInput) return;
+
+      const name = nameInput.value.trim();
+      const color = colorInput.value;
+      if (!name) return;
+
+      badges[index].name = name;
+      badges[index].color = color;
+      saveStoredBadges(badges);
+    }
+
+    function deleteCustomBadge(index) {
+      const badges = getStoredBadges();
+      if (confirm(`Delete badge "${badges[index].name}"?`)) {
+        badges.splice(index, 1);
+        saveStoredBadges(badges);
+      }
+    }
+
+    function openLogoVaultForBadgeSelect(target) {
+      selectingBadgeTargetIndex = target;
+      if (target === 'new') {
+        tempBadgeDraftName = document.getElementById('new-badge-name').value;
+        tempBadgeDraftColor = document.getElementById('new-badge-color').value;
+      }
+      openLogoVaultModal();
+      switchVaultTab('badges');
+    }
+
+    async function loadProfiles() {
+      if (!db || !masterCryptoKey) return;
+      const loadToken = ++profilesLoadToken;
+      try {
+        const tx = db.transaction("vault", "readonly");
+        const store = tx.objectStore("vault");
+        const req = store.getAll();
+
+        req.onsuccess = async () => {
+          const rawList = req.result || [];
+          const decryptedList = (await Promise.all(rawList.map(async item => {
+            try {
+              if (item.encrypted) {
+                const decrypted = await decryptObject(item.encrypted, masterCryptoKey);
+                if (!decrypted || typeof decrypted !== 'object') return null;
+                decrypted.id = Number(item.id);
+                decrypted.name = String(decrypted.name || 'Unnamed Profile');
+                decrypted.cat = String(decrypted.cat || '');
+                decrypted.tag = String(decrypted.tag || '');
+                decrypted.links = Array.isArray(decrypted.links) ? decrypted.links : [];
+                return decrypted;
+              }
+            } catch (e) { console.error("Decryption error", e); }
+            return null;
+          }))).filter(Boolean);
+
+          if (loadToken !== profilesLoadToken) return;
+
+          decryptedList.sort((a, b) => {
+            const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
+            if (pinDiff) return pinDiff;
+            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+          });
+
+          allProfiles = decryptedList;
+          updateDashboardStats();
+          renderCategoryFilterBar();
+          populateBadgeDropdown();
+          renderProfiles();
+        };
+      } catch (err) {
+        console.error("Load profiles transaction failed", err);
+      }
+    }
+
+    async function toggleProfilePin(e, id) {
+      e.stopPropagation();
+      const p = allProfiles.find(x => x.id === Number(id));
+      if (!p || !masterCryptoKey) return;
+
+      p.pinned = !p.pinned;
+      const encryptedPayload = await encryptObject(p, masterCryptoKey);
+      const tx = db.transaction("vault", "readwrite");
+      tx.objectStore("vault").put({ id: Number(p.id), encrypted: encryptedPayload });
+      tx.oncomplete = () => loadProfiles();
+    }
+
+    async function toggleProfileFavorite(e, id) {
+      e.stopPropagation();
+      const p = allProfiles.find(x => x.id === Number(id));
+      if (!p || !masterCryptoKey) return;
+
+      ensureFavoriteCategoryExists();
+      
+      if (p.tag === 'Favorites') {
+        p.tag = p.previousTag || 'Personal';
+        delete p.previousTag;
+      } else {
+        p.previousTag = p.tag;
+        p.tag = 'Favorites';
+      }
+
+      const encryptedPayload = await encryptObject(p, masterCryptoKey);
+      const tx = db.transaction("vault", "readwrite");
+      tx.objectStore("vault").put({ id: Number(p.id), encrypted: encryptedPayload });
+      tx.oncomplete = () => loadProfiles();
+    }
+
+    function setCategoryFilter(cat) {
+      currentCategoryFilter = cat;
+      document.querySelectorAll('.cat-chip').forEach(c => {
+        c.classList.toggle('active', c.innerText.trim().includes(cat));
+      });
+      renderProfiles();
+    }
+
+    function toggleMultiSelectMode() {
+      isMultiSelectMode = !isMultiSelectMode;
+      selectedProfileIds.clear();
+      const floatBtn = document.getElementById('floating-select-btn');
+      if (floatBtn) {
+        floatBtn.style.background = isMultiSelectMode ? '#10b981' : 'var(--primary)';
+        floatBtn.innerHTML = isMultiSelectMode ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-check-square"></i>';
+      }
+      renderProfiles();
+      updateBulkActionBar();
+    }
+
+    function updateBulkActionBar() {
+      let bar = document.getElementById('bulk-action-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'bulk-action-bar';
+        bar.style.cssText = "position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); border-top: 2px solid var(--border-color); padding: 12px 20px; display: none; align-items: center; justify-content: space-between; z-index: 1500; box-shadow: 0 -10px 30px rgba(0,0,0,0.15); backdrop-filter: blur(20px);";
+        document.body.appendChild(bar);
+      }
+
+      if (isMultiSelectMode) {
+        bar.style.display = 'flex';
+        bar.innerHTML = `
+          <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main);">
+            Selected: <span id="selected-count" style="color: var(--primary);">${selectedProfileIds.size}</span>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary" style="padding: 7px 10px; font-size: 0.78rem;" onclick="selectAllProfiles()">Select All</button>
+            <button class="btn btn-secondary" style="padding: 7px 10px; font-size: 0.78rem;" onclick="unselectAllProfiles()">Unselect All</button>
+            <button class="btn btn-danger" style="padding: 7px 10px; font-size: 0.78rem;" onclick="bulkMoveToTrash()" ${selectedProfileIds.size === 0 ? 'disabled style="opacity: 0.5;"' : ''}><i class="fa-solid fa-trash-can"></i> Bin</button>
+            <button class="btn btn-secondary" style="padding: 7px 10px; font-size: 0.78rem;" onclick="toggleMultiSelectMode()">Exit</button>
+          </div>
+        `;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    function selectAllProfiles() {
+      const searchInput = document.getElementById('header-search-input');
+      const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+      let filtered = allProfiles.filter(p => {
+        const matchesQuery = (p.name && p.name.toLowerCase().includes(q)) || 
+                             (p.cat && p.cat.toLowerCase().includes(q)) ||
+                             (Array.isArray(p.links) && p.links.some(l => String(l.title || '').toLowerCase().includes(q) || String(l.url || '').toLowerCase().includes(q)));
+        const matchesCategory = currentCategoryFilter === 'All' || p.tag === currentCategoryFilter;
+        return matchesQuery && matchesCategory;
+      });
+      filtered.forEach(p => selectedProfileIds.add(p.id));
+      renderProfiles();
+      updateBulkActionBar();
+    }
+
+    function unselectAllProfiles() {
+      selectedProfileIds.clear();
+      renderProfiles();
+      updateBulkActionBar();
+    }
+
+    async function bulkMoveToTrash() {
+      if (selectedProfileIds.size === 0) return;
+      if (!confirm(`Move ${selectedProfileIds.size} selected profile(s) to Recycle Bin?`)) return;
+
+      const ids = Array.from(selectedProfileIds);
+      const tx = db.transaction(["vault", "trash"], "readwrite");
+      const vStore = tx.objectStore("vault");
+      const tStore = tx.objectStore("trash");
+
+      for (const id of ids) {
+        vStore.get(Number(id)).onsuccess = (e) => {
+          const record = e.target.result;
+          if (record) {
+            record.trashedAt = Date.now();
+            tStore.add(record);
+            vStore.delete(Number(id));
+          }
+        };
+      }
+
+      tx.oncomplete = () => {
+        selectedProfileIds.clear();
+        isMultiSelectMode = false;
+        const floatBtn = document.getElementById('floating-select-btn');
+        if (floatBtn) {
+          floatBtn.style.background = 'var(--primary)';
+          floatBtn.innerHTML = '<i class="fa-solid fa-check-square"></i>';
+        }
+        updateBulkActionBar();
+        loadProfiles();
+        updateDashboardStats();
+        triggerDirectorySync();
+        if (localStorage.getItem('pm_auto_backup') === 'true') triggerAutoBackupBackground();
+      };
+    }
+
+    function renderProfiles() {
+      const searchInput = document.getElementById('header-search-input');
+      const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+      const container = document.getElementById('cards-container');
+      container.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+
+      let filtered = allProfiles.filter(p => {
+        const matchesQuery = (p.name && p.name.toLowerCase().includes(q)) || 
+                             (p.cat && p.cat.toLowerCase().includes(q)) ||
+                             (p.links && p.links.some(l => l.title.toLowerCase().includes(q) || l.url.toLowerCase().includes(q)));
+        const matchesCategory = currentCategoryFilter === 'All' || p.tag === currentCategoryFilter;
+        return matchesQuery && matchesCategory;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="fa-solid fa-user-shield fa-2x" style="margin-bottom: 8px;"></i><p style="font-size: 0.85rem;">No profiles found.</p></div>';
+        return;
+      }
+
+      const allBadges = getStoredBadges();
+
+      filtered.forEach(p => {
+        const card = document.createElement('div');
+        const isSelected = selectedProfileIds.has(p.id);
+        card.className = `mini-card ${p.pinned ? 'is-pinned' : ''}`;
+        if (isSelected) {
+          card.style.borderColor = 'var(--primary)';
+          card.style.background = 'rgba(99, 102, 241, 0.08)';
+        }
+
+        const avatarSrc = p.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+
+        let badgeHtml = '';
+        if (p.statusBadge && p.statusBadge !== 'none') {
+          const matchedBadge = allBadges.find(b => b.id === p.statusBadge);
+          if (matchedBadge) {
+            badgeHtml = `
+              <span class="dynamic-badge-pill" style="color: ${matchedBadge.color}; border-color: ${matchedBadge.color}60; background: ${matchedBadge.color}15;">
+                ${matchedBadge.icon ? `<img src="${matchedBadge.icon}" class="dynamic-badge-img">` : `<i class="fa-solid fa-certificate"></i>`}
+                ${escapeHtml(matchedBadge.name)}
+              </span>
+            `;
+          }
+        }
+
+        const isFav = (p.tag === 'Favorites');
+
+        let checkboxHtml = '';
+        if (isMultiSelectMode) {
+          checkboxHtml = `
+            <div style="margin-right: 4px; display: flex; align-items: center;">
+              <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 20px; height: 20px; accent-color: var(--primary); pointer-events: none;">
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div style="position: absolute; top: 12px; right: 12px; display: flex; align-items: center; gap: 4px; z-index: 5;">
+            <button class="pin-btn-badge ${isFav ? 'favorited' : ''}" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}" onclick="toggleProfileFavorite(event, ${p.id})">
+              <i class="fa-solid fa-heart"></i>
+            </button>
+            <button class="pin-btn-badge ${p.pinned ? 'pinned' : ''}" title="${p.pinned ? 'Unpin' : 'Pin to Top'}" onclick="toggleProfilePin(event, ${p.id})">
+              <i class="fa-solid fa-thumbtack"></i>
+            </button>
+          </div>
+          ${checkboxHtml}
+          <img class="mini-avatar" src="${avatarSrc}" alt="Avatar" loading="lazy" decoding="async">
+          <div class="mini-info">
+            <div class="mini-name-row">
+              <div class="mini-name">${escapeHtml(p.name || "Unnamed Profile")}</div>
+              ${badgeHtml}
+            </div>
+            <div class="mini-cat">${escapeHtml(p.cat || p.tag || 'Profile')}</div>
+            <span class="mini-badge"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Bio</span>
+          </div>
+        `;
+
+        card.onclick = (e) => {
+          if (e.target.closest('.pin-btn-badge')) return;
+          if (isMultiSelectMode) {
+            if (selectedProfileIds.has(p.id)) {
+              selectedProfileIds.delete(p.id);
+            } else {
+              selectedProfileIds.add(p.id);
+            }
+            renderProfiles();
+            updateBulkActionBar();
+          } else {
+            openBioModal(p.id);
+          }
+        };
+
+        card.oncontextmenu = (e) => {
+          e.preventDefault();
+          if (!isMultiSelectMode) openQuickActionModal(p.id);
+        };
+
+        fragment.appendChild(card);
+      });
+      container.appendChild(fragment);
+    }
+
+    function openQuickActionModal(id) {
+      const p = allProfiles.find(x => x.id === Number(id));
+      if (!p) return;
+      currentQAProfileId = p.id;
+
+      document.getElementById('qa-name').innerText = p.name;
+      document.getElementById('qa-cat').innerText = p.cat || p.tag || 'Profile';
+      document.getElementById('qa-avatar').src = p.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      document.getElementById('quick-action-modal').style.display = 'flex';
+      pushModalHistory('quick-action-modal');
+    }
+
+    function executeQAView() {
+      if (currentQAProfileId) {
+        document.getElementById('quick-action-modal').style.display = 'none';
+        openBioModal(currentQAProfileId);
+        replaceModalHistory('profile-view-modal');
+      }
+    }
+
+    function executeQAEdit() {
+      if (currentQAProfileId) {
+        document.getElementById('quick-action-modal').style.display = 'none';
+        editProfileFromModal(currentQAProfileId);
+        replaceModalHistory('profile-modal');
+      }
+    }
+
+    function executeQATrash() {
+      if (currentQAProfileId) {
+        closeModal('quick-action-modal');
+        moveToTrash(currentQAProfileId);
+      }
+    }
+
+    function openBioModal(id) {
+      const p = allProfiles.find(x => x.id === Number(id));
+      if (!p) return;
+
+      const container = document.getElementById('bio-view-container');
+      container.className = 'bio-view-modal-content';
+      if (p.template && p.template !== 'classic') {
+        container.classList.add(`template-${p.template}`);
+      }
+
+      const coverSrc = p.cover || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80';
+      const avatarSrc = p.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      const body = document.getElementById('bio-modal-body');
+
+      const allBadges = getStoredBadges();
+      let badgeHtml = '';
+      if (p.statusBadge && p.statusBadge !== 'none') {
+        const matchedBadge = allBadges.find(b => b.id === p.statusBadge);
+        if (matchedBadge) {
+          badgeHtml = `
+            <span class="dynamic-badge-pill" style="color: ${matchedBadge.color}; border-color: ${matchedBadge.color}60; background: ${matchedBadge.color}15; font-size:0.75rem;">
+              ${matchedBadge.icon ? `<img src="${matchedBadge.icon}" class="dynamic-badge-img">` : `<i class="fa-solid fa-certificate"></i>`}
+              ${escapeHtml(matchedBadge.name)}
+            </span>
+          `;
+        }
+      }
+
+      let linksHtml = '';
+      const nowTs = Date.now();
+
+      if (p.links && p.links.length > 0) {
+        p.links.forEach((link) => {
+          let iconElement = `<i class="fa-solid fa-link bio-fa-icon" style="color: var(--primary);"></i>`;
+          if (link.iconData) {
+            iconElement = `<img src="${link.iconData}" class="bio-custom-icon" alt="Icon">`;
+          }
+
+          let isExpired = false;
+          let expiryBadge = '';
+          if (link.expiryDate) {
+            const expTs = new Date(link.expiryDate).getTime();
+            if (nowTs > expTs) {
+              isExpired = true;
+              expiryBadge = `<span class="expiry-tag"><i class="fa-solid fa-clock"></i> Expired</span>`;
+            }
+          }
+
+          linksHtml += `
+            <a href="${isExpired ? '#' : ensureUrl(link.url)}" target="${isExpired ? '_self' : '_blank'}" class="bio-link-btn ${isExpired ? 'link-expired' : ''}">
+              ${iconElement}
+              <span>${escapeHtml(link.title)}</span>
+              ${expiryBadge}
+            </a>
+          `;
+        });
+      }
+
+      body.innerHTML = `
+        <img class="bio-cover" src="${coverSrc}" alt="Cover">
+        <div class="bio-avatar-wrapper">
+          <img class="bio-avatar" src="${avatarSrc}" alt="Avatar">
+        </div>
+        <div class="bio-content">
+          <div class="bio-name-wrap">
+            <h2 class="bio-name">${escapeHtml(p.name)}</h2>
+            ${badgeHtml}
+          </div>
+          ${p.cat ? `<div class="bio-title">${escapeHtml(p.cat)}</div>` : ''}
+
+          <div class="bio-links-stack">
+            ${linksHtml}
+          </div>
+
+          <div class="bio-subtle-actions">
+            <button class="subtle-action-btn" onclick="editProfileFromModal(${p.id})"><i class="fa-solid fa-pen"></i> edit</button>
+            <span>•</span>
+            <button class="subtle-action-btn delete-btn" onclick="moveToTrash(${p.id})"><i class="fa-solid fa-trash"></i> trash</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('profile-view-modal').style.display = 'flex';
+      pushModalHistory('profile-view-modal');
+    }
+
+    function initSortableLinks() {
+      const el = document.getElementById('custom-links-container');
+      if (sortableLinksInstance) sortableLinksInstance.destroy();
+      sortableLinksInstance = new Sortable(el, {
+        handle: '.drag-handle',
+        animation: 150
+      });
+    }
+
+    function checkLinkUrlHealth(inputEl, statusElId) {
+      const val = inputEl.value.trim();
+      const statusEl = document.getElementById(statusElId);
+      if (!val) {
+        statusEl.innerText = '';
+        return;
+      }
+      const isValid = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i.test(val);
+      if (isValid) {
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Valid URL Format`;
+        statusEl.className = 'link-health-status link-health-valid';
+      } else {
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Invalid URL (Must include domain like .com / .me)`;
+        statusEl.className = 'link-health-status link-health-invalid';
+      }
+    }
+
+    function addCustomLinkRow(title = '', url = '', iconData = '', expiryDate = '') {
+      const container = document.getElementById('custom-links-container');
+      const rowId = 'link-row-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const statusId = 'status-' + rowId;
+      const row = document.createElement('div');
+      row.className = 'custom-link-row';
+      row.id = rowId;
+
+      const userVaultLogos = getStoredLogoVault();
+      let logoBoxItemsHtml = '';
+      if (userVaultLogos.length > 0) {
+        userVaultLogos.forEach((logoItem, idx) => {
+          const isSelected = (iconData && iconData === logoItem.icon);
+          logoBoxItemsHtml += `
+            <div class="logo-box-item ${isSelected ? 'selected' : ''}" 
+                 id="logo-item-${rowId}-${idx}"
+                 onclick="selectVaultIcon('${rowId}', '${idx}', '${logoItem.icon.replace(/'/g, "\\'")}')">
+              <span class="check-indicator"><i class="fa-solid fa-check"></i></span>
+              <img src="${logoItem.icon}" alt="Logo">
+            </div>
+          `;
+        });
+      } else {
+        logoBoxItemsHtml = `<div style="font-size: 0.72rem; color: var(--text-sub); padding: 4px;">No icons in vault. Upload in 3-dot menu > Logo Vault.</div>`;
+      }
+
+      row.innerHTML = `
+        <div class="custom-link-header">
+          <span><i class="fa-solid fa-grip-vertical drag-handle"></i> <i class="fa-solid fa-link" style="color: var(--primary);"></i> Link Item</span>
+          <button type="button" class="remove-link-btn" onclick="document.getElementById('${rowId}').remove(); autoSaveDraft();"><i class="fa-solid fa-trash"></i> Remove</button>
+        </div>
+        <input type="text" class="input-field link-title-input" placeholder="Title / Handle Name" value="${escapeHtml(title)}" required oninput="autoSaveDraft()">
+        <input type="text" class="input-field link-url-input" placeholder="Target Link (https://...)" value="${escapeHtml(url)}" oninput="checkLinkUrlHealth(this, '${statusId}'); autoSaveDraft();" required>
+        <span class="link-health-status" id="${statusId}"></span>
+
+        <label style="font-size: 0.74rem; font-weight: 600; color: var(--text-sub); display: block; margin-bottom: 3px;">
+          <i class="fa-solid fa-hourglass-half"></i> Expiry Date (Optional):
+        </label>
+        <input type="date" class="input-field link-expiry-input" value="${escapeHtml(expiryDate)}" onchange="autoSaveDraft()">
+
+        <div class="link-logo-box-wrapper">
+          <div class="link-logo-box-title"><span><i class="fa-solid fa-icons" style="color: var(--primary);"></i> Tap to Select Logo:</span></div>
+          <div class="link-logo-grid" id="grid-${rowId}">${logoBoxItemsHtml}</div>
+        </div>
+        <input type="hidden" class="link-icon-data" value="${escapeHtml(iconData)}">
+      `;
+      container.appendChild(row);
+      initSortableLinks();
+      if (url) {
+        checkLinkUrlHealth(row.querySelector('.link-url-input'), statusId);
+      }
+      autoSaveDraft();
+    }
+
+    function selectVaultIcon(rowId, idx, iconBase64) {
+      const row = document.getElementById(rowId);
+      if (row) {
+        row.querySelector('.link-icon-data').value = iconBase64;
+        row.querySelectorAll('.logo-box-item').forEach(item => item.classList.remove('selected'));
+        const active = document.getElementById(`logo-item-${rowId}-${idx}`);
+        if (active) active.classList.add('selected');
+        autoSaveDraft();
+      }
+    }
+
+    async function saveProfile(e) {
+      e.preventDefault();
+      if (!masterCryptoKey) { lockVault(); return; }
+
+      const saveBtn = document.getElementById('save-btn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Encrypting & Saving…';
+      }
+
+      try {
+        const idVal = document.getElementById('p-id').value;
+        const draftKey = document.getElementById('draft-index-key').value;
+
+        const customLinks = [];
+        document.querySelectorAll('.custom-link-row').forEach(row => {
+          const title = row.querySelector('.link-title-input').value.trim();
+          const url = row.querySelector('.link-url-input').value.trim();
+          const iconData = row.querySelector('.link-icon-data').value;
+          const expiryDate = row.querySelector('.link-expiry-input').value;
+          if (title && url) customLinks.push({ title, url, iconData, expiryDate });
+        });
+
+        let selectedTag = document.getElementById('p-tag').value;
+        if (!idVal && selectedTag === 'Favorites') {
+          const cats = getStoredCategories();
+          selectedTag = cats.find(c => c !== 'Favorites') || 'Personal';
+          populateCategoryDropdown(selectedTag);
+        }
+
+        let existingDescriptors = [];
+        let oldProfile = null;
+        if (idVal) {
+          oldProfile = allProfiles.find(x => x.id === Number(idVal));
+          if (oldProfile) {
+            if (!currentAvatarBase64) currentAvatarBase64 = oldProfile.img;
+            if (!currentCoverBase64) currentCoverBase64 = oldProfile.cover;
+            if (Array.isArray(oldProfile.faceDescriptors)) existingDescriptors = [...oldProfile.faceDescriptors];
+            else if (Array.isArray(oldProfile.faceDescriptor)) existingDescriptors = [oldProfile.faceDescriptor];
+          }
+        }
+
+        const profileData = {
+          name: document.getElementById('p-name').value.trim(),
+          cat: document.getElementById('p-cat').value.trim(),
+          tag: selectedTag,
+          statusBadge: document.getElementById('p-status-badge').value,
+          template: document.getElementById('p-template').value,
+          pinned: document.getElementById('p-pinned').checked,
+          links: customLinks,
+          img: currentAvatarBase64,
+          cover: currentCoverBase64,
+          faceDescriptors: existingDescriptors,
+          faceDescriptorVersion: existingDescriptors.length ? FACE_DESCRIPTOR_VERSION : 0
+        };
+
+        // IMPORTANT: saving no longer waits for the expensive face model.
+        // The descriptor is generated after the encrypted profile is safely stored.
+        const encryptedPayload = await encryptObject(profileData, masterCryptoKey);
+        const tx = db.transaction("vault", "readwrite");
+        const store = tx.objectStore("vault");
+        let savedId = idVal ? Number(idVal) : null;
+
+        let writeRequest;
+        if (idVal) writeRequest = store.put({ id: Number(idVal), encrypted: encryptedPayload });
+        else writeRequest = store.add({ encrypted: encryptedPayload });
+
+        writeRequest.onsuccess = () => {
+          if (!savedId) savedId = Number(writeRequest.result);
+        };
+
+        tx.oncomplete = () => {
+          // A resumed draft is consumed by a successful profile save. Cancel any
+          // pending autosave first, then remove the exact draft synchronously so
+          // it cannot be recreated by a late input/change event.
+          draftCaptureSuspended = true;
+          clearTimeout(draftAutoSaveTimer);
+          clearTimeout(draftSaveTimer);
+          const consumedDraftKey = draftKey || activeResumedDraftKey;
+          if (consumedDraftKey) {
+            const drafts = getStoredDrafts().filter(x => x.draftKey !== consumedDraftKey);
+            saveStoredDrafts(drafts, true);
+            activeResumedDraftKey = null;
+          } else {
+            flushDraftSave();
+          }
+          closeModal('profile-modal');
+          setTimeout(() => { draftCaptureSuspended = false; }, 0);
+          loadProfiles();
+
+          // Descriptor generation is now background work.
+          if (savedId && profileData.img) {
+            setTimeout(() => warmProfileFaceDescriptor(savedId, profileData.img), 0);
+          }
+
+          // Directory/backup writes must never block the save UI.
+          setTimeout(() => triggerDirectorySync(), 0);
+          if (localStorage.getItem('pm_auto_backup') === 'true') {
+            setTimeout(() => triggerAutoBackupBackground(), 0);
+          }
+        };
+        tx.onerror = () => {
+          alert('Profile save failed. Your existing data was not changed.');
+        };
+      } catch (err) {
+        console.error('Profile save error:', err);
+        alert('Profile save failed: ' + (err.message || 'Unknown error'));
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Encrypt & Save Profile';
+        }
+      }
+    }
+
+    async function warmProfileFaceDescriptor(profileId, imageSource) {
+      const profile = allProfiles.find(p => Number(p.id) === Number(profileId)) || {
+        id: Number(profileId), img: imageSource, faceDescriptors: []
+      };
+      if (!profile.img) return;
+      try {
+        await getProfileFaceDescriptors(profile);
+      } catch (err) {
+        console.warn('Background face descriptor warm-up failed:', err);
+      }
+    }
+
+    async function triggerAutoBackupBackground() {
+      if (!allProfiles || allProfiles.length === 0) return;
+      const packageData = {
+        version: "3.9",
+        autoSavedAt: new Date().toISOString(),
+        profiles: allProfiles,
+        logoVault: getStoredLogoVault(),
+        badgeVault: getStoredBadgeVault(),
+        customBadges: getStoredBadges()
+      };
+      const encrypted = await encryptObject(packageData, masterCryptoKey);
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(encrypted, null, 2));
+      const a = document.createElement('a');
+      a.href = dataStr;
+      a.download = `auto_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    async function setupDirectorySync() {
+      if (!window.showDirectoryPicker) {
+        alert("File System Access API is not supported in this browser. Please use Manual Backup.");
+        return;
+      }
+      try {
+        directoryHandle = await window.showDirectoryPicker();
+        document.getElementById('sync-folder-status').innerText = `Folder connected: ${directoryHandle.name}`;
+        alert("Local sync folder selected successfully!");
+        triggerDirectorySync();
+      } catch (err) {
+        console.error("Folder selection cancelled or failed", err);
+      }
+    }
+
+    async function triggerDirectorySync() {
+      if (!directoryHandle || !masterCryptoKey) return;
+      try {
+        const packageData = {
+          version: "3.9",
+          dirSyncedAt: new Date().toISOString(),
+          profiles: allProfiles,
+          logoVault: getStoredLogoVault(),
+          badgeVault: getStoredBadgeVault(),
+          customBadges: getStoredBadges()
+        };
+        const encrypted = await encryptObject(packageData, masterCryptoKey);
+        const fileHandle = await directoryHandle.getFileHandle(`bio_vault_sync.json`, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(encrypted, null, 2));
+        await writable.close();
+      } catch (err) {
+        console.error("Directory sync write error:", err);
+      }
+    }
+
+    async function moveToTrash(id) {
+      if (!confirm("Move this profile to Recycle Bin?")) return;
+      const targetId = Number(id);
+      const tx = db.transaction(["vault", "trash"], "readwrite");
+      const vStore = tx.objectStore("vault");
+      const tStore = tx.objectStore("trash");
+
+      vStore.get(targetId).onsuccess = (e) => {
+        const record = e.target.result;
+        if (record) {
+          record.trashedAt = Date.now();
+          tStore.add(record);
+          vStore.delete(targetId);
+        }
+      };
+      tx.oncomplete = () => {
+        closeModal('profile-view-modal');
+        loadProfiles();
+        updateDashboardStats();
+        triggerDirectorySync();
+        if (localStorage.getItem('pm_auto_backup') === 'true') triggerAutoBackupBackground();
+      };
+    }
+
+    async function openTrashModal() {
+      const tx = db.transaction("trash", "readonly");
+      const store = tx.objectStore("trash");
+      const req = store.getAll();
+      const container = document.getElementById('trash-list-container');
+      container.innerHTML = '';
+
+      req.onsuccess = async () => {
+        const list = req.result || [];
+        if (list.length === 0) {
+          container.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-sub); text-align: center;">Recycle Bin is empty.</span>';
+        } else {
+          for (const item of list) {
+            try {
+              const dec = await decryptObject(item.encrypted, masterCryptoKey);
+              const row = document.createElement('div');
+              row.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px;";
+              row.innerHTML = `
+                <span style="font-weight: 600; font-size: 0.85rem;">${escapeHtml(dec.name)}</span>
+                <div>
+                  <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.72rem;" onclick="restoreFromTrash(${item.id})">Restore</button>
+                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem;" onclick="deletePermanently(${item.id})">Delete</button>
+                </div>
+              `;
+              container.appendChild(row);
+            } catch (err) { console.error("Trash decrypt error", err); }
+          }
+        }
+        document.getElementById('trash-modal').style.display = 'flex';
+      };
+    }
+
+    function restoreFromTrash(id) {
+      const tx = db.transaction(["vault", "trash"], "readwrite");
+      const vStore = tx.objectStore("vault");
+      const tStore = tx.objectStore("trash");
+      tStore.get(id).onsuccess = (e) => {
+        const record = e.target.result;
+        if (record) {
+          delete record.id;
+          delete record.trashedAt;
+          vStore.add(record);
+          tStore.delete(id);
+        }
+      };
+      tx.oncomplete = () => {
+        openTrashModal();
+        loadProfiles();
+        updateDashboardStats();
+        triggerDirectorySync();
+      };
+    }
+
+    function deletePermanently(id) {
+      if (confirm("Permanently delete this record?")) {
+        const tx = db.transaction("trash", "readwrite");
+        tx.objectStore("trash").delete(id);
+        tx.oncomplete = () => {
+          openTrashModal();
+          updateDashboardStats();
+        };
+      }
+    }
+
+    function emptyAllTrash() {
+      if (confirm("Permanently delete ALL items in Recycle Bin?")) {
+        const tx = db.transaction("trash", "readwrite");
+        const store = tx.objectStore("trash");
+        store.clear();
+        tx.oncomplete = () => {
+          openTrashModal();
+          updateDashboardStats();
+          alert("Recycle bin cleared successfully!");
+        };
+      }
+    }
+
+    function getStoredLogoVault() { return JSON.parse(localStorage.getItem('pm_user_logo_vault') || '[]'); }
+    function saveStoredLogoVault(list) { localStorage.setItem('pm_user_logo_vault', JSON.stringify(list)); }
+
+    function getStoredBadgeVault() { return JSON.parse(localStorage.getItem('pm_user_badge_vault') || '[]'); }
+    function saveStoredBadgeVault(list) { localStorage.setItem('pm_user_badge_vault', JSON.stringify(list)); }
+
+    function openLogoVaultModal() {
+      renderActiveVaultItems();
+      document.getElementById('logo-vault-modal').style.display = 'flex';
+    }
+
+    function switchVaultTab(tab) {
+      activeVaultTab = tab;
+      document.getElementById('tab-btn-links').classList.toggle('active', tab === 'links');
+      document.getElementById('tab-btn-badges').classList.toggle('active', tab === 'badges');
+      renderActiveVaultItems();
+    }
+
+    function renderActiveVaultItems() {
+      const list = activeVaultTab === 'links' ? getStoredLogoVault() : getStoredBadgeVault();
+      const container = document.getElementById('vault-items-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (list.length === 0) {
+        container.innerHTML = `<span style="font-size: 0.74rem; color: var(--text-sub); grid-column: 1/-1; text-align: center;">No ${activeVaultTab === 'links' ? 'link' : 'badge'} icons in this section. Upload above!</span>`;
+        return;
+      }
+
+      list.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'saved-logo-item';
+        div.style.cursor = selectingBadgeTargetIndex !== null ? 'pointer' : 'default';
+        div.innerHTML = `
+          <button type="button" class="del-logo-btn" onclick="removeItemFromActiveVault(event, ${index})"><i class="fa-solid fa-xmark"></i></button>
+          <img src="${item.icon}" alt="Icon">
+        `;
+
+        div.onclick = () => {
+          if (selectingBadgeTargetIndex !== null) {
+            if (selectingBadgeTargetIndex === 'new') {
+              document.getElementById('new-badge-logo-data').value = item.icon;
+              updateBadgeLivePreview();
+            } else {
+              const badges = getStoredBadges();
+              badges[selectingBadgeTargetIndex].icon = item.icon;
+              saveStoredBadges(badges);
+            }
+            selectingBadgeTargetIndex = null;
+            closeModal('logo-vault-modal');
+            openBadgeManagerModal();
+          }
+        };
+        container.appendChild(div);
+      });
+    }
+
+    function addUploadsToActiveVault() {
+      const fileInput = document.getElementById('dedicated-vault-file');
+      const files = fileInput.files;
+      if (!files || files.length === 0) return alert("Select at least one icon image.");
+      const list = activeVaultTab === 'links' ? getStoredLogoVault() : getStoredBadgeVault();
+      let count = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        fileToBase64Raw(files[i], (b64) => {
+          list.push({ icon: b64 });
+          count++;
+          if (count === files.length) {
+            if (activeVaultTab === 'links') saveStoredLogoVault(list);
+            else saveStoredBadgeVault(list);
+            fileInput.value = '';
+            renderActiveVaultItems();
+            alert(`${files.length} icon(s) added to ${activeVaultTab} vault!`);
+            triggerDirectorySync();
+          }
+        });
+      }
+    }
+
+    function removeItemFromActiveVault(e, index) {
+      e.stopPropagation();
+      if (confirm("Delete this icon?")) {
+        const list = activeVaultTab === 'links' ? getStoredLogoVault() : getStoredBadgeVault();
+        list.splice(index, 1);
+        if (activeVaultTab === 'links') saveStoredLogoVault(list);
+        else saveStoredBadgeVault(list);
+        renderActiveVaultItems();
+        triggerDirectorySync();
+      }
+    }
+
+    function openBackupModal() {
+      document.getElementById('auto-backup-toggle').checked = (localStorage.getItem('pm_auto_backup') === 'true');
+      document.getElementById('backup-modal').style.display = 'flex';
+    }
+
+    function toggleAutoBackup(chk) {
+      localStorage.setItem('pm_auto_backup', chk.checked ? 'true' : 'false');
+      alert(chk.checked ? "Auto-download backup enabled!" : "Auto-backup disabled.");
+    }
+
+    async function executeManualBackup() {
+      if (!allProfiles || allProfiles.length === 0) return alert("No profiles to backup!");
+      const packageData = {
+        version: "3.9",
+        manualSavedAt: new Date().toISOString(),
+        profiles: allProfiles,
+        logoVault: getStoredLogoVault(),
+        badgeVault: getStoredBadgeVault(),
+        customBadges: getStoredBadges()
+      };
+      const encrypted = await encryptObject(packageData, masterCryptoKey);
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(encrypted, null, 2));
+      const a = document.createElement('a');
+      a.href = dataStr;
+      a.download = `manual_secure_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      closeModal('backup-modal');
+      alert("Manual encrypted backup downloaded securely!");
+    }
+
+    function applyPresetTheme(primary, bg, card, text) {
+      document.getElementById('primary-color-input').value = primary;
+      document.getElementById('bg-color-input').value = bg;
+      document.getElementById('card-color-input').value = card;
+      document.getElementById('text-color-input').value = text;
+    }
+
+    function editProfileFromModal(id) {
+      const p = allProfiles.find(x => x.id === Number(id));
+      if (document.getElementById('profile-view-modal').style.display === 'flex') {
+        document.getElementById('profile-view-modal').style.display = 'none';
+      }
+      if (!p) return;
+      document.getElementById('p-id').value = p.id;
+      document.getElementById('draft-index-key').value = '';
+      document.getElementById('p-name').value = p.name || '';
+      document.getElementById('p-cat').value = p.cat || '';
+      populateCategoryDropdown(p.tag || '');
+      populateBadgeDropdown(p.statusBadge || 'none');
+      document.getElementById('p-template').value = p.template || 'classic';
+      document.getElementById('p-pinned').checked = !!p.pinned;
+      
+      currentAvatarBase64 = p.img || '';
+      currentCoverBase64 = p.cover || '';
+
+      document.getElementById('preview-p-img').src = currentAvatarBase64 || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      document.getElementById('preview-p-cover').src = currentCoverBase64 || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80';
+      
+      const container = document.getElementById('custom-links-container');
+      container.innerHTML = '';
+      if (p.links && p.links.length > 0) {
+        p.links.forEach(l => addCustomLinkRow(l.title, l.url, l.iconData, l.expiryDate));
+      }
+      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Profile`;
+      document.getElementById('profile-modal').style.display = 'flex';
+      replaceModalHistory('profile-modal');
+    }
+
+    function openProfileModal() {
+      document.getElementById('profile-form').reset();
+      document.getElementById('p-id').value = '';
+      document.getElementById('draft-index-key').value = 'draft_' + Date.now();
+      currentAvatarBase64 = "";
+      currentCoverBase64 = "";
+      
+      document.getElementById('preview-p-img').src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      document.getElementById('preview-p-cover').src = 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80';
+
+      const cats = getStoredCategories();
+      const defaultCat = cats.includes('Personal') ? 'Personal' : (cats.find(c => c !== 'Favorites') || cats[0]);
+      populateCategoryDropdown(defaultCat);
+      populateBadgeDropdown();
+      document.getElementById('p-template').value = 'classic';
+      document.getElementById('p-pinned').checked = false;
+      document.getElementById('custom-links-container').innerHTML = '';
+      addCustomLinkRow('', '');
+      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-id-card" style="color: var(--primary);"></i> Create New Profile`;
+      document.getElementById('profile-modal').style.display = 'flex';
+      pushModalHistory('profile-modal');
+    }
+
+    let cropperInstance = null, pendingCropCallback = null, cropOutputWidth = 400, cropOutputHeight = 400;
+    let currentScaleX = 1;
+
+    document.getElementById('p-img').addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        fileToBase64Raw(e.target.files[0], (b64) => {
+          openCropper(b64, 1/1, "Crop Avatar (1:1 Ratio)", 400, 400, (croppedRes) => {
+            currentAvatarBase64 = croppedRes;
+            document.getElementById('preview-p-img').src = croppedRes;
+            autoSaveDraft();
+          });
+        });
+        e.target.value = '';
+      }
+    });
+
+    document.getElementById('p-cover').addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        fileToBase64Raw(e.target.files[0], (b64) => {
+          openCropper(b64, 16/9, "Crop Banner Cover (16:9 Ratio)", 800, 450, (croppedRes) => {
+            currentCoverBase64 = croppedRes;
+            document.getElementById('preview-p-cover').src = croppedRes;
+            autoSaveDraft();
+          });
+        });
+        e.target.value = '';
+      }
+    });
+
+    function openCropper(imageSrc, aspectRatio, title, outW, outH, callback) {
+      const cropperModal = document.getElementById('cropper-modal');
+      document.getElementById('cropper-title').innerHTML = `<i class="fa-solid fa-crop-simple" style="color: var(--primary);"></i> ${title}`;
+      const imageEl = document.getElementById('cropper-image');
+      imageEl.src = imageSrc;
+      cropOutputWidth = outW; 
+      cropOutputHeight = outH; 
+      pendingCropCallback = callback;
+      currentScaleX = 1;
+      
+      cropperModal.style.display = 'flex';
+
+      if (cropperInstance) cropperInstance.destroy();
+      cropperInstance = new Cropper(imageEl, { 
+        aspectRatio: aspectRatio, 
+        viewMode: 1, 
+        autoCropArea: 0.95,
+        responsive: true,
+        background: false,
+        zoomable: true,
+        scalable: true,
+        rotatable: true
+      });
+    }
+
+    function cropperStudioZoom(val) { if (cropperInstance) cropperInstance.zoom(val); }
+    function cropperStudioRotate(deg) { if (cropperInstance) cropperInstance.rotate(deg); }
+    function cropperStudioReset() { if (cropperInstance) { cropperInstance.reset(); currentScaleX = 1; } }
+    function cropperStudioFlip() {
+      if (cropperInstance) {
+        currentScaleX = currentScaleX === 1 ? -1 : 1;
+        cropperInstance.scaleX(currentScaleX);
+      }
+    }
+
+    function applyCrop() {
+      if (cropperInstance && pendingCropCallback) {
+        const canvas = cropperInstance.getCroppedCanvas({ 
+          width: cropOutputWidth, 
+          height: cropOutputHeight,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high'
+        });
+        if (canvas) {
+          const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          pendingCropCallback(croppedDataUrl);
+        }
+        closeCropperModal();
+      }
+    }
+
+    function closeCropperModal() {
+      document.getElementById('cropper-modal').style.display = 'none';
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+      }
+      pendingCropCallback = null;
+    }
+
+    function toggleHeaderSearch() {
+      const input = document.getElementById('header-search-input');
+      input.classList.toggle('expanded');
+      if (input.classList.contains('expanded')) {
+        input.focus();
+      } else {
+        input.value = '';
+        document.getElementById('search-predictive-dropdown').classList.remove('show');
+        renderProfiles();
+      }
+    }
+
+    function toggleOptionsMenu(event) {
+      event.stopPropagation();
+      document.getElementById('options-dropdown').classList.toggle('show');
+    }
+    function closeOptionsMenu() {
+      document.getElementById('options-dropdown').classList.remove('show');
+    }
+    window.addEventListener('click', (e) => {
+      if (!e.target.closest('.dropdown-wrapper')) closeOptionsMenu();
+      if (!e.target.closest('.header-search-wrap')) {
+        document.getElementById('search-predictive-dropdown').classList.remove('show');
+      }
+    });
+
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      input.type = input.type === "password" ? "text" : "password";
+      icon.classList.toggle("fa-eye-slash");
+    }
+
+    function openSettingsModal() {
+      document.getElementById('set-uid').value = localStorage.getItem('pm_user_id') || '';
+      document.getElementById('set-autolock-timer').value = localStorage.getItem('pm_autolock_ms') || '600000';
+      document.getElementById('set-old-pass').value = '';
+      document.getElementById('set-pass').value = '';
+      document.getElementById('set-rec-key').value = '';
+      document.getElementById('settings-modal').style.display = 'flex';
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const newUid = document.getElementById('set-uid').value.trim();
+      const autoLockVal = document.getElementById('set-autolock-timer').value;
+      const oldPass = document.getElementById('set-old-pass').value;
+      const newPass = document.getElementById('set-pass').value;
+      const newRecKey = document.getElementById('set-rec-key').value.trim();
+      const saltStr = localStorage.getItem('pm_vault_salt');
+      const canaryStr = localStorage.getItem('pm_auth_canary');
+
+      try {
+        const salt = new Uint8Array(JSON.parse(saltStr));
+        const testKey = await deriveKey(oldPass, salt);
+        const canaryPayload = JSON.parse(canaryStr);
+        const decryptedCanary = await decryptObject(canaryPayload, testKey);
+
+        if (!decryptedCanary || decryptedCanary.verify !== VERIFY_CANARY_TEXT) {
+          alert("Incorrect current password!");
+          return;
+        }
+
+        const newSalt = crypto.getRandomValues(new Uint8Array(32));
+        const newKey = await deriveKey(newPass, newSalt);
+
+        if (db) {
+          for (const p of allProfiles) {
+            const encryptedPayload = await encryptObject(p, newKey);
+            const tx = db.transaction("vault", "readwrite");
+            tx.objectStore("vault").put({ id: p.id, encrypted: encryptedPayload });
+          }
+        }
+
+        const newCanary = await encryptObject({ verify: VERIFY_CANARY_TEXT }, newKey);
+        localStorage.setItem('pm_vault_salt', JSON.stringify(Array.from(newSalt)));
+        localStorage.setItem('pm_auth_canary', JSON.stringify(newCanary));
+        localStorage.setItem('pm_user_id', newUid);
+        localStorage.setItem('pm_autolock_ms', autoLockVal);
+        sessionStorage.setItem('pm_session_pass', newPass);
+
+        if (newRecKey) {
+          const recSalt = crypto.getRandomValues(new Uint8Array(32));
+          const recCrypto = await deriveKey(newRecKey, recSalt);
+          const newRecCanary = await encryptObject({ verify: VERIFY_CANARY_TEXT }, recCrypto);
+          localStorage.setItem('pm_rec_salt', JSON.stringify(Array.from(recSalt)));
+          localStorage.setItem('pm_auth_recovery', JSON.stringify(newRecCanary));
+        }
+
+        masterCryptoKey = newKey;
+        resetInactivityTimer();
+        closeModal('settings-modal');
+        alert("Master password and security settings updated successfully!");
+      } catch (err) {
+        alert("Error updating settings: " + err.message);
+      }
+    }
+
+    function openAppearanceModal() {
+      document.getElementById('app-title-input').value = localStorage.getItem('pm_app_title') || "Bio Links";
+      document.getElementById('primary-color-input').value = localStorage.getItem('pm_color_primary') || "#4f46e5";
+      document.getElementById('bg-color-input').value = localStorage.getItem('pm_color_bg') || "#f8fafc";
+      document.getElementById('card-color-input').value = localStorage.getItem('pm_color_card') || "#ffffff";
+      document.getElementById('text-color-input').value = localStorage.getItem('pm_color_text') || "#0f172a";
+      document.getElementById('card-radius-slider').value = localStorage.getItem('pm_card_radius') || "18";
+      document.getElementById('app-font-select').value = localStorage.getItem('pm_app_font') || "'Plus Jakarta Sans', system-ui, sans-serif";
+      document.getElementById('app-layout-select').value = localStorage.getItem('pm_app_layout') || "layout-list";
+      document.getElementById('appearance-modal').style.display = 'flex';
+    }
+
+    function saveAppearance(e) {
+      e.preventDefault();
+      localStorage.setItem('pm_app_title', document.getElementById('app-title-input').value.trim() || "Bio Links");
+      localStorage.setItem('pm_color_primary', document.getElementById('primary-color-input').value);
+      localStorage.setItem('pm_color_bg', document.getElementById('bg-color-input').value);
+      localStorage.setItem('pm_color_card', document.getElementById('card-color-input').value);
+      localStorage.setItem('pm_color_text', document.getElementById('text-color-input').value);
+      localStorage.setItem('pm_card_radius', document.getElementById('card-radius-slider').value);
+      localStorage.setItem('pm_app_font', document.getElementById('app-font-select').value);
+      localStorage.setItem('pm_app_layout', document.getElementById('app-layout-select').value);
+      
+      if (customAppLogoBase64) localStorage.setItem('pm_app_logo', customAppLogoBase64);
+      if (customAppBgBase64) localStorage.setItem('pm_app_bg', customAppBgBase64);
+
+      loadAppearance();
+      closeModal('appearance-modal');
+      alert("Appearance settings saved!");
+    }
+
+    function resetAppearance() {
+      if (confirm("Reset theme to defaults?")) {
+        localStorage.removeItem('pm_app_title');
+        localStorage.removeItem('pm_color_primary');
+        localStorage.removeItem('pm_color_bg');
+        localStorage.removeItem('pm_color_card');
+        localStorage.removeItem('pm_color_text');
+        localStorage.removeItem('pm_card_radius');
+        localStorage.removeItem('pm_app_font');
+        localStorage.removeItem('pm_app_layout');
+        localStorage.removeItem('pm_app_logo');
+        localStorage.removeItem('pm_app_bg');
+        customAppLogoBase64 = "";
+        customAppBgBase64 = "";
+        document.documentElement.style.removeProperty('--primary');
+        document.documentElement.style.removeProperty('--bg');
+        document.documentElement.style.removeProperty('--card-bg');
+        document.documentElement.style.removeProperty('--text-main');
+        document.documentElement.style.removeProperty('--card-radius');
+        document.documentElement.style.removeProperty('--app-font');
+        document.documentElement.style.removeProperty('--bg-image');
+        loadAppearance();
+        closeModal('appearance-modal');
+      }
+    }
+
+    function loadAppearance() {
+      const primaryColor = localStorage.getItem('pm_color_primary') || '#4f46e5';
+      const bgColor = localStorage.getItem('pm_color_bg') || '#f8fafc';
+      const cardColor = localStorage.getItem('pm_color_card') || '#ffffff';
+      const textColor = localStorage.getItem('pm_color_text') || '#0f172a';
+      const cardRadius = localStorage.getItem('pm_card_radius') || '18';
+      const appFont = localStorage.getItem('pm_app_font') || "'Plus Jakarta Sans', system-ui, sans-serif";
+      const appLayout = localStorage.getItem('pm_app_layout') || "layout-list";
+      const appTitle = localStorage.getItem('pm_app_title') || "Bio Links";
+
+      document.documentElement.style.setProperty('--primary', primaryColor);
+      document.documentElement.style.setProperty('--bg', bgColor);
+      document.documentElement.style.setProperty('--card-bg', cardColor);
+      document.documentElement.style.setProperty('--text-main', textColor);
+      document.documentElement.style.setProperty('--card-radius', `${cardRadius}px`);
+      document.documentElement.style.setProperty('--app-font', appFont);
+
+      const cardsContainer = document.getElementById('cards-container');
+      if (cardsContainer) {
+        cardsContainer.className = `mini-cards-grid ${appLayout}`;
+      }
+
+      if (customAppBgBase64) document.documentElement.style.setProperty('--bg-image', `url(${customAppBgBase64})`);
+      else document.documentElement.style.setProperty('--bg-image', 'none');
+
+      document.getElementById('app-title-display').innerHTML = `<i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> ${escapeHtml(appTitle)}`;
+
+      const appLogoWrap = document.getElementById('app-logo-container');
+      const loginLogoWrap = document.getElementById('login-logo-container');
+      if (customAppLogoBase64) {
+        if (appLogoWrap) appLogoWrap.innerHTML = `<img src="${customAppLogoBase64}" class="header-logo-img" alt="Logo">`;
+        if (loginLogoWrap) loginLogoWrap.innerHTML = `<img src="${customAppLogoBase64}" class="header-logo-img" style="margin-bottom:8px;" alt="Logo">`;
+      } else {
+        if (appLogoWrap) appLogoWrap.innerHTML = '';
+        if (loginLogoWrap) loginLogoWrap.innerHTML = '';
+      }
+
+      const isDark = (document.body.getAttribute('data-theme') === 'dark');
+      const icon = document.getElementById('theme-switch-icon-graphic');
+      if (icon) {
+        icon.className = isDark ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', next);
+      loadAppearance();
+    }
+
+    function ensureUrl(url) {
+      if (!url) return '';
+      url = url.trim();
+      return (url.startsWith('http://') || url.startsWith('https://')) ? url : 'https://' + url;
+    }
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function fileToBase64Raw(file, callback) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => callback(e.target.result);
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById('app-logo-input').addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        fileToBase64Raw(e.target.files[0], (b64) => { customAppLogoBase64 = b64; });
+      }
+    });
+    document.getElementById('app-bg-input').addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) {
+        fileToBase64Raw(e.target.files[0], (b64) => { customAppBgBase64 = b64; });
+      }
+    });
+
+    function exportToCSV() {
+      if (!allProfiles || allProfiles.length === 0) return alert("No profiles to export!");
+      const headers = ["SL", "Name", "Category", "Pinned", "Status Badge", "Links Details"];
+      const rows = allProfiles.map((p, index) => [
+        index + 1,
+        `"${(p.name || '').replace(/"/g, '""')}"`,
+        `"${(p.tag || '').replace(/"/g, '""')}"`,
+        p.pinned ? "Yes" : "No",
+        p.statusBadge || "None",
+        `"${(p.links || []).map(l => `${l.title}: ${l.url} ${l.expiryDate ? `(Exp: ${l.expiryDate})` : ''}`).join(' | ').replace(/"/g, '""')}"`
+      ]);
+      const csvString = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
+      const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Bio_Profiles_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    }
+
+    function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          let dataArray = [];
+          if (Array.isArray(parsed)) {
+            dataArray = parsed;
+          } else if (parsed.profiles) {
+            dataArray = parsed.profiles;
+            if (parsed.logoVault && Array.isArray(parsed.logoVault)) saveStoredLogoVault(parsed.logoVault);
+            if (parsed.badgeVault && Array.isArray(parsed.badgeVault)) saveStoredBadgeVault(parsed.badgeVault);
+            if (parsed.customBadges && Array.isArray(parsed.customBadges)) saveStoredBadges(parsed.customBadges);
+          } else if (parsed.iv && parsed.data) {
+            const decryptedPackage = await decryptObject(parsed, masterCryptoKey);
+            dataArray = decryptedPackage.profiles || [];
+            if (decryptedPackage.logoVault) saveStoredLogoVault(decryptedPackage.logoVault);
+            if (decryptedPackage.badgeVault) saveStoredBadgeVault(decryptedPackage.badgeVault);
+            if (decryptedPackage.customBadges) saveStoredBadges(decryptedPackage.customBadges);
+          }
+
+          if (Array.isArray(dataArray) && dataArray.length > 0) {
+            for (const item of dataArray) {
+              delete item.id;
+              const encryptedPayload = await encryptObject(item, masterCryptoKey);
+              const tx = db.transaction("vault", "readwrite");
+              tx.objectStore("vault").add({ encrypted: encryptedPayload });
+            }
+            alert('Data synced and restored successfully!');
+            loadProfiles();
+          } else {
+            alert('No valid profiles found in backup file.');
+          }
+        } catch (err) { alert('Invalid sync/backup JSON file or decryption key mismatch.'); }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    }
+
+    let deferredPrompt;
+    window.addEventListener('pagehide', () => {
+      try { captureDraftSnapshot(true); } catch (err) {}
+      flushDraftSave();
+    });
+    window.addEventListener('beforeunload', () => {
+      try { captureDraftSnapshot(true); } catch (err) {}
+      flushDraftSave();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        try { captureDraftSnapshot(true); } catch (err) {}
+        flushDraftSave();
+      }
+    });
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installItem = document.getElementById('pwa-install-item');
+      if (installItem) installItem.style.display = 'flex';
+    });
+    function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+          document.getElementById('pwa-install-item').style.display = 'none';
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        self.addEventListener('install', e => self.skipWaiting());
+        self.addEventListener('activate', e => self.waitUntil(clients.claim()));
+        self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))));
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(console.error);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadScreenView();
+      loadAppearance();
+      ensureFavoriteCategoryExists();
+      renderCategoryFilterBar();
+      populateBadgeDropdown();
+      const quickSel = document.getElementById('quick-autolock-select');
+      if (quickSel) {
+        quickSel.value = localStorage.getItem('pm_autolock_setting') || '600000';
+      }
+      checkInitialization();
+      draftMemoryCache = null;
+      getStoredDrafts();
+      updateDraftBadgeCount();
+    });
+  </script>
+</body>
+</html>
