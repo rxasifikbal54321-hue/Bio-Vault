@@ -842,14 +842,14 @@
     </div>
 
     <!-- Profiles Grid -->
-    <div class="mini-cards-grid layout-list" id="cards-container"></div>
-
-    <!-- Bottom Add Button -->
-    <div class="bottom-add-container">
+    <!-- Add Profile Button: directly above the first profile -->
+    <div class="bottom-add-container" style="margin-top: 0; margin-bottom: 18px;">
       <button class="btn-add-bottom" onclick="openProfileModal()">
         <i class="fa-solid fa-plus-circle"></i> Add New Profile
       </button>
     </div>
+
+    <div class="mini-cards-grid layout-list" id="cards-container"></div>
   </div>
 
   <!-- Floating Multi-Select Toggle Button -->
@@ -2110,36 +2110,44 @@
       }
     }
 
+    function renderTrashCount() {
+      const value = String(Math.max(0, Number(trashCountCache) || 0));
+      const el = document.getElementById('stat-trash-count');
+      const modalEl = document.getElementById('trash-modal-count');
+      if (el) el.innerText = value;
+      if (modalEl) modalEl.innerText = `(${value})`;
+    }
+
+    function refreshTrashCount() {
+      if (!db) { renderTrashCount(); return; }
+      try {
+        const tx = db.transaction('trash', 'readonly');
+        const req = tx.objectStore('trash').count();
+        req.onsuccess = () => {
+          trashCountCache = Number(req.result) || 0;
+          renderTrashCount();
+        };
+        req.onerror = () => renderTrashCount();
+        tx.onerror = () => renderTrashCount();
+      } catch (e) {
+        console.warn('Trash count refresh deferred:', e);
+        renderTrashCount();
+      }
+    }
+
     function updateDashboardStats() {
       const totalProfilesEl = document.getElementById('stat-total-profiles');
       const totalLinksEl = document.getElementById('stat-total-links');
-      const trashCountEl = document.getElementById('stat-trash-count');
       if (!totalProfilesEl) return;
 
       totalProfilesEl.innerText = allProfiles.length;
       let linkCount = 0;
       allProfiles.forEach(p => { if (Array.isArray(p.links)) linkCount += p.links.length; });
       if (totalLinksEl) totalLinksEl.innerText = linkCount;
-      if (trashCountEl) trashCountEl.innerText = String(trashCountCache);
-
-      // Refresh only the trash counter asynchronously. Never write 0 merely
-      // because IndexedDB is busy/unavailable for a moment.
-      if (db) {
-        try {
-          const tx = db.transaction('trash', 'readonly');
-          const req = tx.objectStore('trash').count();
-          req.onsuccess = () => {
-            trashCountCache = Number(req.result) || 0;
-            const el = document.getElementById('stat-trash-count');
-            const modalEl = document.getElementById('trash-modal-count');
-            if (el) el.innerText = String(trashCountCache);
-            if (modalEl) modalEl.innerText = `(${trashCountCache})`;
-          };
-          // Intentionally keep the last known count on transient errors.
-        } catch (e) {
-          console.warn('Trash count refresh deferred:', e);
-        }
-      }
+      // Paint the last known value first, then reconcile with IndexedDB.
+      // Never reset the counter to 0 just because the database is momentarily busy.
+      renderTrashCount();
+      refreshTrashCount();
     }
 
     
@@ -2973,7 +2981,10 @@ function showStatDetails(type) {
           floatBtn.innerHTML = '<i class="fa-solid fa-check-square"></i>';
         }
         updateBulkActionBar();
+        trashCountCache = Math.max(0, Number(trashCountCache) || 0) + ids.length;
+        renderTrashCount();
         loadProfiles();
+        refreshTrashCount();
         updateDashboardStats();
         triggerDirectorySync();
         if (localStorage.getItem('pm_auto_backup') === 'true') triggerAutoBackupBackground();
@@ -3421,8 +3432,31 @@ function showStatDetails(type) {
         if (idVal) writeRequest = store.put({ id: Number(idVal), encrypted: encryptedPayload });
         else writeRequest = store.add({ encrypted: encryptedPayload });
 
+        // IndexedDB reports the generated id as soon as the write request succeeds.
+        // Update the in-memory list and UI at that moment instead of waiting for
+        // transaction completion or any background work. This makes a newly saved
+        // profile appear on the main page immediately.
+        let uiCommitted = false;
+        const commitSavedProfileToUI = () => {
+          if (uiCommitted) return;
+          uiCommitted = true;
+          const normalizedSavedId = Number(savedId);
+          const savedProfile = { ...profileData, id: normalizedSavedId };
+          const existingProfileIndex = allProfiles.findIndex(p => Number(p.id) === normalizedSavedId);
+          if (existingProfileIndex >= 0) allProfiles[existingProfileIndex] = savedProfile;
+          else allProfiles.push(savedProfile);
+          allProfiles.sort((a, b) => {
+            const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
+            if (pinDiff) return pinDiff;
+            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+          });
+          updateDashboardStats();
+          renderProfiles();
+        };
+
         writeRequest.onsuccess = () => {
           if (!savedId) savedId = Number(writeRequest.result);
+          commitSavedProfileToUI();
         };
 
         tx.oncomplete = () => {
@@ -3446,21 +3480,9 @@ function showStatDetails(type) {
           closeModal('profile-modal');
           setTimeout(() => { draftCaptureSuspended = false; }, 0);
 
-          // The just-saved profile is already available in memory. Updating only
-          // this record avoids decrypting and re-rendering every profile after
-          // each save, which becomes increasingly expensive with many profiles.
-          const normalizedSavedId = Number(savedId);
-          const savedProfile = { ...profileData, id: normalizedSavedId };
-          const existingProfileIndex = allProfiles.findIndex(p => Number(p.id) === normalizedSavedId);
-          if (existingProfileIndex >= 0) allProfiles[existingProfileIndex] = savedProfile;
-          else allProfiles.push(savedProfile);
-          allProfiles.sort((a, b) => {
-            const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
-            if (pinDiff) return pinDiff;
-            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-          });
-          updateDashboardStats();
-          renderProfiles();
+          // The UI was already committed from writeRequest.onsuccess. Keep the
+          // transaction-complete handler focused on cleanup/background work.
+          commitSavedProfileToUI();
 
           // Keep the save/render path responsive. Expensive face analysis and
           // directory/backup encryption run only when the browser is idle.
@@ -3582,6 +3604,9 @@ function showStatDetails(type) {
         closeModal('profile-view-modal');
         allProfiles = allProfiles.filter(p => Number(p.id) !== targetId);
         renderProfiles();
+        trashCountCache = Math.max(0, Number(trashCountCache) || 0) + 1;
+        renderTrashCount();
+        refreshTrashCount();
         updateDashboardStats();
         const runWhenIdle = (fn, timeout = 3000) => {
           if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
@@ -3644,7 +3669,9 @@ function showStatDetails(type) {
         }
       };
       tx.oncomplete = () => {
-        trashCountCache = Math.max(0, trashCountCache - 1);
+        trashCountCache = Math.max(0, Number(trashCountCache) - 1);
+        renderTrashCount();
+        refreshTrashCount();
         updateDashboardStats();
         openTrashModal();
         loadProfiles();
@@ -3661,7 +3688,9 @@ function showStatDetails(type) {
         const tx = db.transaction("trash", "readwrite");
         tx.objectStore("trash").delete(id);
         tx.oncomplete = () => {
-          trashCountCache = Math.max(0, trashCountCache - 1);
+          trashCountCache = Math.max(0, Number(trashCountCache) - 1);
+          renderTrashCount();
+          refreshTrashCount();
           updateDashboardStats();
           openTrashModal();
         };
@@ -3675,6 +3704,8 @@ function showStatDetails(type) {
         store.clear();
         tx.oncomplete = () => {
           trashCountCache = 0;
+          renderTrashCount();
+          refreshTrashCount();
           updateDashboardStats();
           openTrashModal();
           alert("Recycle bin cleared successfully!");
