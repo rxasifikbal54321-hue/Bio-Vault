@@ -1025,7 +1025,7 @@
   <div class="modal" id="trash-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-trash-can" style="color: #ea580c;"></i> Recycle Bin</h3>
+        <h3 id="trash-modal-title" style="font-size: 1.05rem; font-weight: 800;"><i class="fa-solid fa-trash-can" style="color: #ea580c;"></i> Recycle Bin <span id="trash-modal-count" style="font-size:.72rem;color:var(--text-sub);font-weight:700;">(0)</span></h3>
         <button class="btn btn-secondary btn-icon-only" onclick="closeModal('trash-modal')"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <p style="font-size: 0.76rem; font-weight: 600; color: var(--text-sub); margin-bottom: 12px;">Items in trash auto-clean after 30 days.</p>
@@ -1131,7 +1131,8 @@
         <div class="editor-section-card">
           <div class="editor-section-header"><i class="fa-solid fa-user-tag"></i> 2. Identity & Classification</div>
           
-          <input type="text" id="p-name" class="input-field" placeholder="Full Profile Name *" required oninput="autoSaveDraft()">
+          <input type="text" id="p-name" class="input-field" placeholder="Full Profile Name *" required oninput="autoSaveDraft(); clearDuplicateProfileNotice();">
+          <div id="duplicate-profile-notice" style="display:none;margin:-2px 0 10px 0;"></div>
           <input type="text" id="p-cat" class="input-field" placeholder="Headline / Bio Subtitle" oninput="autoSaveDraft()">
 
           <label style="font-size: 0.78rem; font-weight: 800; color: var(--text-sub); display: block; margin-bottom: 6px;">Profile Category:</label>
@@ -1649,6 +1650,8 @@
     let db;
     let masterCryptoKey = null;
     let allProfiles = [];
+    let trashCountCache = 0;
+    let dashboardStatsUpdateToken = 0;
     let profilesLoadToken = 0;
     let currentCategoryFilter = 'All';
     let directoryHandle = null;
@@ -1731,6 +1734,8 @@
     // Stable UI/draft state: keeps modal navigation and draft persistence deterministic.
     let draftCaptureSuspended = false;
     let activeResumedDraftKey = null;
+    // Prevent a successfully consumed draft from being recreated by a late input/close event.
+    let lastConsumedDraftKey = null;
     let modalHistoryLock = false;
     let activeModalHistory = null;
 
@@ -1837,6 +1842,7 @@
 
     let draftAutoSaveTimer = null;
     function autoSaveDraft() {
+      if (draftCaptureSuspended) return;
       clearTimeout(draftAutoSaveTimer);
       draftAutoSaveTimer = setTimeout(captureDraftSnapshot, 650);
     }
@@ -1845,6 +1851,8 @@
       if (draftCaptureSuspended && !force) return;
       const idVal = document.getElementById('p-id').value;
       if (idVal) return;
+      const currentDraftKey = document.getElementById('draft-index-key').value;
+      if (currentDraftKey && currentDraftKey === lastConsumedDraftKey) return;
 
       const nameVal = document.getElementById('p-name').value.trim();
       const catVal = document.getElementById('p-cat').value.trim();
@@ -2093,39 +2101,43 @@
               store.delete(item.id);
             }
           });
-          updateDashboardStats();
+          tx.oncomplete = () => {
+            updateDashboardStats();
+          };
         };
       } catch (err) {
         console.error("Auto clean trash error", err);
       }
     }
 
-    async function updateDashboardStats() {
+    function updateDashboardStats() {
       const totalProfilesEl = document.getElementById('stat-total-profiles');
       const totalLinksEl = document.getElementById('stat-total-links');
       const trashCountEl = document.getElementById('stat-trash-count');
-
       if (!totalProfilesEl) return;
 
       totalProfilesEl.innerText = allProfiles.length;
-
       let linkCount = 0;
-      allProfiles.forEach(p => {
-        if (p.links) linkCount += p.links.length;
-      });
-      totalLinksEl.innerText = linkCount;
+      allProfiles.forEach(p => { if (Array.isArray(p.links)) linkCount += p.links.length; });
+      if (totalLinksEl) totalLinksEl.innerText = linkCount;
+      if (trashCountEl) trashCountEl.innerText = String(trashCountCache);
 
+      // Refresh only the trash counter asynchronously. Never write 0 merely
+      // because IndexedDB is busy/unavailable for a moment.
       if (db) {
         try {
-          const tx = db.transaction("trash", "readonly");
-          const store = tx.objectStore("trash");
-          const req = store.count();
+          const tx = db.transaction('trash', 'readonly');
+          const req = tx.objectStore('trash').count();
           req.onsuccess = () => {
-            trashCountEl.innerText = req.result || 0;
+            trashCountCache = Number(req.result) || 0;
+            const el = document.getElementById('stat-trash-count');
+            const modalEl = document.getElementById('trash-modal-count');
+            if (el) el.innerText = String(trashCountCache);
+            if (modalEl) modalEl.innerText = `(${trashCountCache})`;
           };
-          req.onerror = () => { trashCountEl.innerText = 0; };
+          // Intentionally keep the last known count on transient errors.
         } catch (e) {
-          trashCountEl.innerText = 0;
+          console.warn('Trash count refresh deferred:', e);
         }
       }
     }
@@ -3286,6 +3298,29 @@ function showStatDetails(type) {
       }
     }
 
+    function clearDuplicateProfileNotice() {
+      const el = document.getElementById('duplicate-profile-notice');
+      if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    }
+
+    function showDuplicateProfileNotice(profile, requestedName) {
+      const el = document.getElementById('duplicate-profile-notice');
+      if (!el || !profile) return;
+      const avatar = profile.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+      el.innerHTML = `
+        <div style="font-size:.72rem;color:var(--danger);font-weight:800;margin-bottom:6px;">
+          <i class="fa-solid fa-circle-exclamation"></i> Profile already exists
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(0,0,0,.025);border:1px solid var(--border-color);border-radius:10px;">
+          <img src="${avatar}" loading="lazy" decoding="async" alt="" style="width:42px;height:42px;border-radius:50%;object-fit:cover;flex:0 0 42px;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:800;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(profile.name || requestedName || 'Unnamed Profile')}</div>
+            <div style="font-size:.68rem;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(profile.cat || profile.tag || 'Profile')}</div>
+          </div>
+        </div>`;
+      el.style.display = 'block';
+    }
+
     async function saveProfile(e) {
       e.preventDefault();
       if (!masterCryptoKey) { lockVault(); return; }
@@ -3329,8 +3364,40 @@ function showStatDetails(type) {
           }
         }
 
+        const profileName = document.getElementById('p-name').value.trim();
+
+        // Prevent duplicate profile names for BOTH new profiles and edits.
+        // The current profile itself is ignored when editing.
+        if (profileName) {
+          const duplicateProfile = allProfiles.find(p =>
+            Number(p.id) !== Number(idVal) &&
+            String(p.name || '').trim().localeCompare(profileName, undefined, { sensitivity: 'base' }) === 0
+          );
+
+          if (duplicateProfile) {
+            // Do NOT let the duplicate attempt become a draft. Cancel any pending
+            // autosave and remove only this editor's draft, while leaving the
+            // normal draft system untouched for all other situations.
+            clearTimeout(draftAutoSaveTimer);
+            clearTimeout(draftSaveTimer);
+            draftCaptureSuspended = true;
+            const duplicateDraftKey = document.getElementById('draft-index-key').value;
+            if (duplicateDraftKey) {
+              const drafts = getStoredDrafts().filter(x => x.draftKey !== duplicateDraftKey);
+              saveStoredDrafts(drafts, true);
+            }
+            showDuplicateProfileNotice(duplicateProfile, profileName);
+            if (saveBtn) {
+              saveBtn.disabled = false;
+              saveBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Encrypt & Save Profile';
+            }
+            setTimeout(() => { draftCaptureSuspended = false; }, 0);
+            return;
+          }
+        }
+
         const profileData = {
-          name: document.getElementById('p-name').value.trim(),
+          name: profileName,
           cat: document.getElementById('p-cat').value.trim(),
           tag: selectedTag,
           statusBadge: document.getElementById('p-status-badge').value,
@@ -3367,6 +3434,9 @@ function showStatDetails(type) {
           clearTimeout(draftSaveTimer);
           const consumedDraftKey = draftKey || activeResumedDraftKey;
           if (consumedDraftKey) {
+            // Consume the exact draft synchronously and remember its key so no late
+            // autosave/close event can recreate it after the profile is saved.
+            lastConsumedDraftKey = consumedDraftKey;
             const drafts = getStoredDrafts().filter(x => x.draftKey !== consumedDraftKey);
             saveStoredDrafts(drafts, true);
             activeResumedDraftKey = null;
@@ -3392,15 +3462,18 @@ function showStatDetails(type) {
           updateDashboardStats();
           renderProfiles();
 
-          // Descriptor generation is now background work.
+          // Keep the save/render path responsive. Expensive face analysis and
+          // directory/backup encryption run only when the browser is idle.
+          const runWhenIdle = (fn, timeout = 2000) => {
+            if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
+            else setTimeout(fn, 250);
+          };
           if (savedId && profileData.img) {
-            setTimeout(() => warmProfileFaceDescriptor(savedId, profileData.img), 0);
+            runWhenIdle(() => warmProfileFaceDescriptor(savedId, profileData.img), 3000);
           }
-
-          // Directory/backup writes must never block the save UI.
-          setTimeout(() => triggerDirectorySync(), 1500);
+          runWhenIdle(() => triggerDirectorySync(), 4000);
           if (localStorage.getItem('pm_auto_backup') === 'true') {
-            setTimeout(() => triggerAutoBackupBackground(), 1500);
+            runWhenIdle(() => triggerAutoBackupBackground(), 5000);
           }
         };
         tx.onerror = () => {
@@ -3507,10 +3580,15 @@ function showStatDetails(type) {
       };
       tx.oncomplete = () => {
         closeModal('profile-view-modal');
-        loadProfiles();
+        allProfiles = allProfiles.filter(p => Number(p.id) !== targetId);
+        renderProfiles();
         updateDashboardStats();
-        triggerDirectorySync();
-        if (localStorage.getItem('pm_auto_backup') === 'true') triggerAutoBackupBackground();
+        const runWhenIdle = (fn, timeout = 3000) => {
+          if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
+          else setTimeout(fn, 250);
+        };
+        runWhenIdle(() => triggerDirectorySync(), 4000);
+        if (localStorage.getItem('pm_auto_backup') === 'true') runWhenIdle(() => triggerAutoBackupBackground(), 5000);
       };
     }
 
@@ -3523,6 +3601,11 @@ function showStatDetails(type) {
 
       req.onsuccess = async () => {
         const list = req.result || [];
+        trashCountCache = list.length;
+        const trashModalCount = document.getElementById('trash-modal-count');
+        if (trashModalCount) trashModalCount.innerText = `(${trashCountCache})`;
+        const trashCountEl = document.getElementById('stat-trash-count');
+        if (trashCountEl) trashCountEl.innerText = String(trashCountCache);
         if (list.length === 0) {
           container.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-sub); text-align: center;">Recycle Bin is empty.</span>';
         } else {
@@ -3543,6 +3626,7 @@ function showStatDetails(type) {
           }
         }
         document.getElementById('trash-modal').style.display = 'flex';
+        updateDashboardStats();
       };
     }
 
@@ -3560,10 +3644,15 @@ function showStatDetails(type) {
         }
       };
       tx.oncomplete = () => {
+        trashCountCache = Math.max(0, trashCountCache - 1);
+        updateDashboardStats();
         openTrashModal();
         loadProfiles();
-        updateDashboardStats();
-        triggerDirectorySync();
+        const runWhenIdle = (fn, timeout = 3000) => {
+          if ('requestIdleCallback' in window) requestIdleCallback(fn, { timeout });
+          else setTimeout(fn, 250);
+        };
+        runWhenIdle(() => triggerDirectorySync(), 4000);
       };
     }
 
@@ -3572,8 +3661,9 @@ function showStatDetails(type) {
         const tx = db.transaction("trash", "readwrite");
         tx.objectStore("trash").delete(id);
         tx.oncomplete = () => {
-          openTrashModal();
+          trashCountCache = Math.max(0, trashCountCache - 1);
           updateDashboardStats();
+          openTrashModal();
         };
       }
     }
@@ -3584,8 +3674,9 @@ function showStatDetails(type) {
         const store = tx.objectStore("trash");
         store.clear();
         tx.oncomplete = () => {
-          openTrashModal();
+          trashCountCache = 0;
           updateDashboardStats();
+          openTrashModal();
           alert("Recycle bin cleared successfully!");
         };
       }
@@ -3740,6 +3831,7 @@ function showStatDetails(type) {
       document.getElementById('p-id').value = p.id;
       document.getElementById('draft-index-key').value = '';
       document.getElementById('p-name').value = p.name || '';
+      clearDuplicateProfileNotice();
       document.getElementById('p-cat').value = p.cat || '';
       populateCategoryDropdown(p.tag || '');
       populateBadgeDropdown(p.statusBadge || 'none');
@@ -3765,6 +3857,7 @@ function showStatDetails(type) {
     function openProfileModal() {
       document.getElementById('profile-form').reset();
       document.getElementById('p-id').value = '';
+      clearDuplicateProfileNotice();
       document.getElementById('draft-index-key').value = 'draft_' + Date.now();
       currentAvatarBase64 = "";
       currentCoverBase64 = "";
