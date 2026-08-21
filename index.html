@@ -453,10 +453,6 @@
     .drag-handle { cursor: grab; color: var(--text-sub); font-size: 0.95rem; margin-right: 6px; }
     .custom-link-row .link-title-input, .custom-link-row .link-url-input { user-select: text; -webkit-user-select: text; touch-action: manipulation; pointer-events: auto; position: relative; z-index: 2; }
 
-    .link-health-status { font-size: 0.7rem; font-weight: 800; margin-top: -6px; margin-bottom: 10px; display: block; text-align: left; }
-    .link-health-valid { color: #10b981; }
-    .link-health-invalid { color: #ef4444; }
-
     .link-logo-box-wrapper { margin-top: 10px; background: rgba(0, 0, 0, 0.02); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 10px; }
     .link-logo-box-title { font-size: 0.76rem; font-weight: 800; color: var(--text-sub); margin-bottom: 8px; }
     .link-logo-grid { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
@@ -3224,27 +3220,133 @@ function showStatDetails(type) {
       });
     }
 
-    function checkLinkUrlHealth(inputEl, statusElId) {
-      const val = inputEl.value.trim();
-      const statusEl = document.getElementById(statusElId);
-      if (!val) {
-        statusEl.innerText = '';
-        return;
+    function getReadableLinkFallback(url) {
+      const raw = String(url || '').trim();
+      if (!raw) return '';
+
+      try {
+        const normalized = /^(https?:)?\/\//i.test(raw) ? raw : `https://${raw}`;
+        const parsed = new URL(normalized);
+        const host = parsed.hostname.toLowerCase().replace(/^www\./i, '');
+
+        // Known platforms: always use the clean platform name only.
+        const platformNames = {
+          'instagram.com': 'Instagram',
+          'facebook.com': 'Facebook',
+          'fb.com': 'Facebook',
+          'youtube.com': 'YouTube',
+          'youtu.be': 'YouTube',
+          'tiktok.com': 'TikTok',
+          'twitter.com': 'Twitter',
+          'x.com': 'X',
+          'linkedin.com': 'LinkedIn',
+          'github.com': 'GitHub',
+          'discord.com': 'Discord',
+          'discord.gg': 'Discord',
+          'telegram.org': 'Telegram',
+          't.me': 'Telegram',
+          'whatsapp.com': 'WhatsApp',
+          'wa.me': 'WhatsApp',
+          'reddit.com': 'Reddit',
+          'pinterest.com': 'Pinterest',
+          'snapchat.com': 'Snapchat',
+          'threads.net': 'Threads',
+          'spotify.com': 'Spotify',
+          'soundcloud.com': 'SoundCloud',
+          'twitch.tv': 'Twitch',
+          'medium.com': 'Medium',
+          'behance.net': 'Behance',
+          'dribbble.com': 'Dribbble'
+        };
+
+        if (platformNames[host]) return platformNames[host];
+
+        // Also support subdomains such as m.instagram.com.
+        const matchedPlatform = Object.entries(platformNames)
+          .find(([domain]) => host === domain || host.endsWith(`.${domain}`));
+        if (matchedPlatform) return matchedPlatform[1];
+
+        // For other websites, use a clean site/domain name as the immediate fallback.
+        const base = host.split('.')[0] || host;
+        return base
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, char => char.toUpperCase());
+      } catch (_) {
+        return raw.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0];
       }
-      const isValid = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i.test(val);
-      if (isValid) {
-        statusEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Valid URL Format`;
-        statusEl.className = 'link-health-status link-health-valid';
-      } else {
-        statusEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Invalid URL (Must include domain like .com / .me)`;
-        statusEl.className = 'link-health-status link-health-invalid';
+    }
+
+    function extractHtmlTitle(html) {
+      if (!html) return '';
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const og = doc.querySelector('meta[property="og:title"], meta[name="twitter:title"]');
+      return (og?.getAttribute('content') || doc.querySelector('title')?.textContent || '').trim().replace(/\s+/g, ' ');
+    }
+
+    async function autoFillLinkTitle(urlInput) {
+      const row = urlInput.closest('.custom-link-row');
+      const titleInput = row?.querySelector('.link-title-input');
+      if (!row || !titleInput) return;
+
+      const rawUrl = urlInput.value.trim();
+      if (!rawUrl) return;
+
+      const previousUrl = row.dataset.lastAutoTitleUrl || '';
+      const currentTitle = titleInput.value.trim();
+      const oldAutoTitle = row.dataset.autoTitle || '';
+
+      // Never overwrite a title manually changed by the user.
+      if (currentTitle && currentTitle !== oldAutoTitle && previousUrl !== rawUrl) return;
+
+      const fallback = getReadableLinkFallback(rawUrl);
+      row.dataset.lastAutoTitleUrl = rawUrl;
+
+      // Show an immediate usable title while metadata is being requested.
+      if (!currentTitle || currentTitle === oldAutoTitle) {
+        titleInput.value = fallback || currentTitle;
+        row.dataset.autoTitle = titleInput.value.trim();
+        autoSaveDraft();
+      }
+
+      // Best-effort title lookup. Some external sites block browser CORS;
+      // the fallback above keeps the feature working without affecting saving.
+      try {
+        const normalized = /^(https?:)?\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+        const response = await fetch(normalized, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+        });
+        if (!response.ok) return;
+        const html = await response.text();
+        const detectedTitle = extractHtmlTitle(html);
+        if (!detectedTitle || row.dataset.lastAutoTitleUrl !== rawUrl) return;
+
+        // Keep platform names clean (e.g. an Instagram URL stays exactly "Instagram").
+        const immediateFallback = getReadableLinkFallback(rawUrl);
+        const knownPlatformTitles = new Set([
+          'Instagram', 'Facebook', 'YouTube', 'TikTok', 'Twitter', 'X',
+          'LinkedIn', 'GitHub', 'Discord', 'Telegram', 'WhatsApp', 'Reddit',
+          'Pinterest', 'Snapchat', 'Threads', 'Spotify', 'SoundCloud',
+          'Twitch', 'Medium', 'Behance', 'Dribbble'
+        ]);
+        if (knownPlatformTitles.has(immediateFallback)) return;
+
+        const liveTitle = titleInput.value.trim();
+        if (!liveTitle || liveTitle === oldAutoTitle || liveTitle === fallback) {
+          titleInput.value = detectedTitle;
+          row.dataset.autoTitle = detectedTitle;
+          autoSaveDraft();
+        }
+      } catch (_) {
+        // CORS/network restrictions are expected for many third-party sites.
       }
     }
 
     function addCustomLinkRow(title = '', url = '', iconData = '', expiryDate = '') {
       const container = document.getElementById('custom-links-container');
       const rowId = 'link-row-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-      const statusId = 'status-' + rowId;
       const row = document.createElement('div');
       row.className = 'custom-link-row';
       row.id = rowId;
@@ -3255,7 +3357,7 @@ function showStatDetails(type) {
         userVaultLogos.forEach((logoItem, idx) => {
           const isSelected = (iconData && iconData === logoItem.icon);
           logoBoxItemsHtml += `
-            <div class="logo-box-item ${isSelected ? 'selected' : ''}" 
+            <div class="logo-box-item ${isSelected ? 'selected' : ''}"
                  id="logo-item-${rowId}-${idx}"
                  onclick="selectVaultIcon('${rowId}', '${idx}', '${logoItem.icon.replace(/'/g, "\\'")}')">
               <span class="check-indicator"><i class="fa-solid fa-check"></i></span>
@@ -3272,9 +3374,8 @@ function showStatDetails(type) {
           <span><i class="fa-solid fa-grip-vertical drag-handle"></i> <i class="fa-solid fa-link" style="color: var(--primary);"></i> Link Item</span>
           <button type="button" class="remove-link-btn" onclick="document.getElementById('${rowId}').remove(); autoSaveDraft();"><i class="fa-solid fa-trash"></i> Remove</button>
         </div>
-        <input type="text" class="input-field link-title-input" placeholder="Title / Handle Name" value="${escapeHtml(title)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" required oninput="autoSaveDraft()">
-        <input type="text" class="input-field link-url-input" placeholder="Target Link (https://...)" value="${escapeHtml(url)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" oninput="checkLinkUrlHealth(this, '${statusId}'); autoSaveDraft();" required>
-        <span class="link-health-status" id="${statusId}"></span>
+        <input type="text" class="input-field link-title-input" placeholder="Link Title (auto-filled, editable)" value="${escapeHtml(title)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" required oninput="autoSaveDraft()">
+        <input type="text" class="input-field link-url-input" placeholder="Target Link (https://...)" value="${escapeHtml(url)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" oninput="autoSaveDraft()" onchange="autoFillLinkTitle(this)" onblur="autoFillLinkTitle(this)" required>
 
         <label style="font-size: 0.74rem; font-weight: 600; color: var(--text-sub); display: block; margin-bottom: 3px;">
           <i class="fa-solid fa-hourglass-half"></i> Expiry Date (Optional):
@@ -3288,10 +3389,9 @@ function showStatDetails(type) {
         <input type="hidden" class="link-icon-data" value="${escapeHtml(iconData)}">
       `;
       container.appendChild(row);
+      row.dataset.autoTitle = title || '';
+      row.dataset.lastAutoTitleUrl = url || '';
       initSortableLinks();
-      if (url) {
-        checkLinkUrlHealth(row.querySelector('.link-url-input'), statusId);
-      }
       autoSaveDraft();
     }
 
