@@ -2263,15 +2263,12 @@ function showStatDetails(type) {
 
       showSearchProgress('Text search', `Searching profiles, categories and links for “${query}”…`, 25);
       textSearchTimer = setTimeout(() => {
+        // Predictive profile suggestions match the PROFILE NAME only,
+        // from the beginning of the name. Category, tag, link title, and URL
+        // must not cause unrelated profiles to appear in suggestions.
         const matches = allProfiles.filter(p => {
-          const nameMatch = p.name && p.name.toLowerCase().includes(q);
-          const catMatch = p.cat && p.cat.toLowerCase().includes(q);
-          const tagMatch = p.tag && p.tag.toLowerCase().includes(q);
-          const linkMatch = Array.isArray(p.links) && p.links.some(l =>
-            String(l.title || '').toLowerCase().includes(q) ||
-            String(l.url || '').toLowerCase().includes(q)
-          );
-          return nameMatch || catMatch || tagMatch || linkMatch;
+          const profileName = String(p.name || '').toLowerCase().trim();
+          return profileName.startsWith(q);
         });
 
         updateSearchProgress(`${matches.length} matching profile${matches.length === 1 ? '' : 's'} found.`, 100);
