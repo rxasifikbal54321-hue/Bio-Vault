@@ -2791,7 +2791,24 @@ function showStatDetails(type) {
       switchVaultTab('badges');
     }
 
-    async function loadProfiles() {
+    async function sortProfilesInPlace(list = allProfiles) {
+      list.sort((a, b) => {
+        const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
+        if (pinDiff) return pinDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+      });
+      return list;
+    }
+
+    function refreshProfilesUI({ filters = false, badges = false } = {}) {
+      sortProfilesInPlace();
+      updateDashboardStats();
+      if (filters) renderCategoryFilterBar();
+      if (badges) populateBadgeDropdown();
+      renderProfiles();
+    }
+
+    function loadProfiles() {
       if (!db || !masterCryptoKey) return;
       const loadToken = ++profilesLoadToken;
       try {
@@ -2802,46 +2819,47 @@ function showStatDetails(type) {
         req.onsuccess = async () => {
           const rawList = req.result || [];
           const decryptedList = [];
-          // Decrypt in small batches so a large vault does not monopolize the UI.
-          const DECRYPT_BATCH_SIZE = 12;
+          const DECRYPT_BATCH_SIZE = 32;
           for (let i = 0; i < rawList.length; i += DECRYPT_BATCH_SIZE) {
             const batch = rawList.slice(i, i + DECRYPT_BATCH_SIZE);
             const batchResult = await Promise.all(batch.map(async item => {
               try {
-                if (item.encrypted) {
-                  const decrypted = await decryptObject(item.encrypted, masterCryptoKey);
-                  if (!decrypted || typeof decrypted !== 'object') return null;
-                  decrypted.id = Number(item.id);
-                  decrypted.name = String(decrypted.name || 'Unnamed Profile');
-                  decrypted.cat = String(decrypted.cat || '');
-                  decrypted.tag = String(decrypted.tag || '');
-                  decrypted.links = Array.isArray(decrypted.links) ? decrypted.links : [];
-                  return decrypted;
-                }
-              } catch (e) { console.error("Decryption error", e); }
-              return null;
+                if (!item.encrypted) return null;
+                const decrypted = await decryptObject(item.encrypted, masterCryptoKey);
+                if (!decrypted || typeof decrypted !== 'object') return null;
+                decrypted.id = Number(item.id);
+                decrypted.name = String(decrypted.name || 'Unnamed Profile');
+                decrypted.cat = String(decrypted.cat || '');
+                decrypted.tag = String(decrypted.tag || '');
+                decrypted.links = Array.isArray(decrypted.links) ? decrypted.links : [];
+                return decrypted;
+              } catch (e) { console.error("Decryption error", e); return null; }
             }));
             for (const profile of batchResult) if (profile) decryptedList.push(profile);
-            if (i + DECRYPT_BATCH_SIZE < rawList.length) await new Promise(requestAnimationFrame);
+            if (i + DECRYPT_BATCH_SIZE < rawList.length) await new Promise(resolve => {
+              if ('requestIdleCallback' in window) requestIdleCallback(resolve, { timeout: 50 });
+              else setTimeout(resolve, 0);
+            });
           }
 
           if (loadToken !== profilesLoadToken) return;
-
-          decryptedList.sort((a, b) => {
-            const pinDiff = Number(!!b.pinned) - Number(!!a.pinned);
-            if (pinDiff) return pinDiff;
-            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
-          });
-
           allProfiles = decryptedList;
-          updateDashboardStats();
-          renderCategoryFilterBar();
-          populateBadgeDropdown();
-          renderProfiles();
+          refreshProfilesUI({ filters: true, badges: true });
         };
       } catch (err) {
         console.error("Load profiles transaction failed", err);
       }
+    }
+
+    async function persistProfileFast(profile) {
+      const encryptedPayload = await encryptObject(profile, masterCryptoKey);
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("vault", "readwrite");
+        tx.objectStore("vault").put({ id: Number(profile.id), encrypted: encryptedPayload });
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Profile update failed'));
+        tx.onabort = () => reject(tx.error || new Error('Profile update aborted'));
+      });
     }
 
     async function toggleProfilePin(e, id) {
@@ -2850,10 +2868,15 @@ function showStatDetails(type) {
       if (!p || !masterCryptoKey) return;
 
       p.pinned = !p.pinned;
-      const encryptedPayload = await encryptObject(p, masterCryptoKey);
-      const tx = db.transaction("vault", "readwrite");
-      tx.objectStore("vault").put({ id: Number(p.id), encrypted: encryptedPayload });
-      tx.oncomplete = () => loadProfiles();
+      // Optimistic UI: do not decrypt/reload the entire vault after one small change.
+      refreshProfilesUI();
+      try {
+        await persistProfileFast(p);
+      } catch (err) {
+        p.pinned = !p.pinned;
+        refreshProfilesUI();
+        console.error('Pin update failed', err);
+      }
     }
 
     async function toggleProfileFavorite(e, id) {
@@ -2862,7 +2885,8 @@ function showStatDetails(type) {
       if (!p || !masterCryptoKey) return;
 
       ensureFavoriteCategoryExists();
-      
+      const oldTag = p.tag;
+      const oldPreviousTag = p.previousTag;
       if (p.tag === 'Favorites') {
         p.tag = p.previousTag || 'Personal';
         delete p.previousTag;
@@ -2871,10 +2895,17 @@ function showStatDetails(type) {
         p.tag = 'Favorites';
       }
 
-      const encryptedPayload = await encryptObject(p, masterCryptoKey);
-      const tx = db.transaction("vault", "readwrite");
-      tx.objectStore("vault").put({ id: Number(p.id), encrypted: encryptedPayload });
-      tx.oncomplete = () => loadProfiles();
+      // Same optimistic path keeps the heart response instant.
+      refreshProfilesUI({ filters: true });
+      try {
+        await persistProfileFast(p);
+      } catch (err) {
+        p.tag = oldTag;
+        if (oldPreviousTag === undefined) delete p.previousTag;
+        else p.previousTag = oldPreviousTag;
+        refreshProfilesUI({ filters: true });
+        console.error('Favorite update failed', err);
+      }
     }
 
     function setCategoryFilter(cat) {
